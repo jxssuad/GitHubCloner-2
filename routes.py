@@ -229,27 +229,33 @@ def admin_remove_access():
             user_accesses = UserAccess.query.filter_by(user_id=user_id).all()
             scripts_to_remove = [access.pine_script for access in user_accesses]
         
+        # Remove access from all scripts at once
+        pine_ids_to_remove = [script.pine_id for script in scripts_to_remove]
+        results = tv_api.remove_access(user.tradingview_username, pine_ids_to_remove)
+        
         removed_scripts = []
-        for script in scripts_to_remove:
-            success = tv_api.remove_access(user.tradingview_username, script.pine_id)
-            if success:
-                # Remove from database
-                UserAccess.query.filter_by(
-                    user_id=user_id, 
-                    pine_script_id=script.id
-                ).delete()
-                removed_scripts.append(script.name)
-                
-                # Log the action
-                log_entry = AccessLog(
-                    user_id=current_user.id,
-                    username=user.tradingview_username,
-                    action='remove',
-                    pine_script_id=script.pine_id,
-                    status='success',
-                    details=f'Removed by admin: {current_user.email}'
-                )
-                db.session.add(log_entry)
+        for result in results:
+            if result.get('removed', False):
+                # Find corresponding script
+                script = next((s for s in scripts_to_remove if s.pine_id == result['pine_id']), None)
+                if script:
+                    # Remove from database
+                    UserAccess.query.filter_by(
+                        user_id=user_id, 
+                        pine_script_id=script.id
+                    ).delete()
+                    removed_scripts.append(script.name)
+                    
+                    # Log the action
+                    log_entry = AccessLog(
+                        user_id=current_user.id,
+                        username=user.tradingview_username,
+                        action='remove',
+                        pine_script_id=script.pine_id,
+                        status='success',
+                        details=f'Removed by admin: {current_user.email}'
+                    )
+                    db.session.add(log_entry)
         
         # Reset user's access generation flag if all access removed
         remaining_access = UserAccess.query.filter_by(user_id=user_id).count()
@@ -350,34 +356,39 @@ def api_grant_access():
         tv_api = TradingViewAPI()
         scripts = PineScript.query.filter(PineScript.pine_id.in_(pine_ids)).all()
         
+        # Grant access to all scripts at once
+        results = tv_api.grant_access(username, pine_ids)
+        
         granted_count = 0
-        for script in scripts:
-            success = tv_api.grant_access(username, script.pine_id)
-            if success:
-                # Check if access already exists
-                existing_access = UserAccess.query.filter_by(
-                    user_id=current_user.id,
-                    pine_script_id=script.id
-                ).first()
-                
-                if not existing_access:
-                    user_access = UserAccess(
+        for result in results:
+            if result.get('hasAccess', False):
+                # Find the corresponding script
+                script = next((s for s in scripts if s.pine_id == result['pine_id']), None)
+                if script:
+                    # Check if access already exists
+                    existing_access = UserAccess.query.filter_by(
                         user_id=current_user.id,
-                        pine_script_id=script.id,
-                        tradingview_username=username
+                        pine_script_id=script.id
+                    ).first()
+                    
+                    if not existing_access:
+                        user_access = UserAccess(
+                            user_id=current_user.id,
+                            pine_script_id=script.id,
+                            tradingview_username=username
+                        )
+                        db.session.add(user_access)
+                    
+                    # Log the action
+                    log_entry = AccessLog(
+                        user_id=current_user.id,
+                        username=username,
+                        action='grant',
+                        pine_script_id=script.pine_id,
+                        status='success'
                     )
-                    db.session.add(user_access)
-                
-                # Log the action
-                log_entry = AccessLog(
-                    user_id=current_user.id,
-                    username=username,
-                    action='grant',
-                    pine_script_id=script.pine_id,
-                    status='success'
-                )
-                db.session.add(log_entry)
-                granted_count += 1
+                    db.session.add(log_entry)
+                    granted_count += 1
         
         # Update user flags
         current_user.has_generated_access = True
@@ -411,23 +422,29 @@ def api_remove_access():
         
         # Get all user accesses
         user_accesses = UserAccess.query.filter_by(user_id=current_user.id).all()
+        pine_ids_to_remove = [access.pine_script.pine_id for access in user_accesses]
+        
+        # Remove access from all scripts at once
+        results = tv_api.remove_access(username, pine_ids_to_remove)
         
         removed_count = 0
-        for access in user_accesses:
-            success = tv_api.remove_access(username, access.pine_script.pine_id)
-            if success:
-                db.session.delete(access)
-                
-                # Log the action
-                log_entry = AccessLog(
-                    user_id=current_user.id,
-                    username=username,
-                    action='remove',
-                    pine_script_id=access.pine_script.pine_id,
-                    status='success'
-                )
-                db.session.add(log_entry)
-                removed_count += 1
+        for result in results:
+            if result.get('removed', False):
+                # Find and remove the corresponding access
+                access = next((a for a in user_accesses if a.pine_script.pine_id == result['pine_id']), None)
+                if access:
+                    db.session.delete(access)
+                    
+                    # Log the action
+                    log_entry = AccessLog(
+                        user_id=current_user.id,
+                        username=username,
+                        action='remove',
+                        pine_script_id=access.pine_script.pine_id,
+                        status='success'
+                    )
+                    db.session.add(log_entry)
+                    removed_count += 1
         
         # Reset user flags
         current_user.has_generated_access = False

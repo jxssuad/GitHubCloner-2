@@ -304,7 +304,9 @@ class TradingViewAPI:
                 response = self.session.post(
                     add_access_url,
                     data=body,
-                    headers=headers
+                    headers=headers,
+                    timeout=30,
+                    verify=True
                 )
                 
                 logger.debug(f"Grant access API response: {response.status_code}")
