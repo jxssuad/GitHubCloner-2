@@ -38,12 +38,19 @@ def manage():
         username = request.form.get('username', '').strip()
         pine_ids_input = request.form.get('pine_ids', '').strip()
         
+        # Check if this is an AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        
         # Validate inputs
         if not username:
+            if is_ajax:
+                return jsonify({"success": False, "message": "Username is required", "type": "danger"})
             flash("Username is required", "danger")
             return redirect(url_for('main.manage'))
         
-        if not pine_ids_input:
+        if not pine_ids_input and action != 'validate':
+            if is_ajax:
+                return jsonify({"success": False, "message": "At least one Pine Script ID is required", "type": "danger"})
             flash("At least one Pine Script ID is required", "danger")
             return redirect(url_for('main.manage'))
         
@@ -54,7 +61,10 @@ def manage():
             if action == 'validate':
                 result = tv_api.validate_username(username)
                 if result['validuser']:
-                    flash(f"Username '{result['verifiedUserName']}' is valid", "success")
+                    message = f"Username '{result['verifiedUserName']}' is valid"
+                    if is_ajax:
+                        return jsonify({"success": True, "message": message, "type": "success", "data": result})
+                    flash(message, "success")
                     # Log validation
                     log = AccessLog(
                         username=username,
@@ -66,7 +76,10 @@ def manage():
                     db.session.add(log)
                     db.session.commit()
                 else:
-                    flash(f"Username '{username}' is not valid", "warning")
+                    message = f"Username '{username}' is not valid"
+                    if is_ajax:
+                        return jsonify({"success": False, "message": message, "type": "warning", "data": result})
+                    flash(message, "warning")
                     # Log failed validation
                     log = AccessLog(
                         username=username,
@@ -85,10 +98,12 @@ def manage():
                     status = "Has Access" if result['hasAccess'] else "No Access"
                     access_summary.append(f"{result['pine_id']}: {status}")
                 
-                if access_summary:
-                    flash(f"Access Status: {'; '.join(access_summary)}", "info")
-                else:
-                    flash("Unable to retrieve access information", "warning")
+                message = f"Access Status: {'; '.join(access_summary)}" if access_summary else "Unable to retrieve access information"
+                msg_type = "info" if access_summary else "warning"
+                
+                if is_ajax:
+                    return jsonify({"success": bool(access_summary), "message": message, "type": msg_type, "data": results})
+                flash(message, msg_type)
                 
                 # Log check operation
                 log = AccessLog(
@@ -103,11 +118,13 @@ def manage():
             
             elif action == 'grant':
                 results = tv_api.grant_access(username, pine_ids)
-                success_count = sum(1 for r in results if r.get('status') == 'Success')
-                if success_count > 0:
-                    flash(f"Successfully granted access to {success_count} script(s)", "success")
-                else:
-                    flash("Failed to grant access", "danger")
+                success_count = sum(1 for r in results if 'Success' in r.get('status', ''))
+                message = f"Successfully granted access to {success_count} script(s)" if success_count > 0 else "Failed to grant access"
+                msg_type = "success" if success_count > 0 else "danger"
+                
+                if is_ajax:
+                    return jsonify({"success": success_count > 0, "message": message, "type": msg_type, "data": results})
+                flash(message, msg_type)
                 
                 # Log grant operation
                 log = AccessLog(
@@ -122,11 +139,13 @@ def manage():
             
             elif action == 'remove':
                 results = tv_api.remove_access(username, pine_ids)
-                success_count = sum(1 for r in results if r.get('status') == 'Success')
-                if success_count > 0:
-                    flash(f"Successfully removed access from {success_count} script(s)", "success")
-                else:
-                    flash("Failed to remove access", "danger")
+                success_count = sum(1 for r in results if 'Success' in r.get('status', ''))
+                message = f"Successfully removed access from {success_count} script(s)" if success_count > 0 else "Failed to remove access"
+                msg_type = "success" if success_count > 0 else "danger"
+                
+                if is_ajax:
+                    return jsonify({"success": success_count > 0, "message": message, "type": msg_type, "data": results})
+                flash(message, msg_type)
                 
                 # Log remove operation
                 log = AccessLog(
@@ -141,9 +160,13 @@ def manage():
         
         except Exception as e:
             logger.error(f"Error in manage operation: {e}")
-            flash(f"Error: {str(e)}", "danger")
+            error_message = f"Error: {str(e)}"
+            if is_ajax:
+                return jsonify({"success": False, "message": error_message, "type": "danger"})
+            flash(error_message, "danger")
         
-        return redirect(url_for('main.manage'))
+        if not is_ajax:
+            return redirect(url_for('main.manage'))
     
     # GET request - show form
     pine_scripts = PineScript.query.filter_by(is_active=True).all()

@@ -188,34 +188,23 @@ function performAction(action) {
     // Make AJAX request
     fetch('/manage', {
         method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
         body: formData
     })
     .then(response => {
-        if (response.redirected) {
-            // Handle redirect (likely with flash messages)
-            window.location.href = response.url;
-        } else {
-            return response.text();
+        if (response.ok) {
+            return response.json();
         }
+        throw new Error('Network response was not ok');
     })
     .then(data => {
-        if (data) {
-            // Parse the response to extract flash messages
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(data, 'text/html');
-            const alerts = doc.querySelectorAll('.alert');
-            
-            // Display flash messages
-            alerts.forEach(alert => {
-                const message = alert.textContent.trim();
-                const type = alert.classList.contains('alert-success') ? 'success' :
-                           alert.classList.contains('alert-danger') ? 'danger' :
-                           alert.classList.contains('alert-warning') ? 'warning' : 'info';
-                showAlert(message, type);
-            });
-            
-            showResults(action, username, pineIds);
-        }
+        // Display the message from server
+        showAlert(data.message, data.type);
+        
+        // Show results section with data
+        showResults(action, username, pineIds, data);
     })
     .catch(error => {
         console.error('Error:', error);
@@ -253,7 +242,7 @@ function showAlert(message, type) {
     }, 5000);
 }
 
-function showResults(action, username, pineIds) {
+function showResults(action, username, pineIds, data) {
     const resultsSection = document.getElementById('resultsSection');
     const resultsContent = document.getElementById('resultsContent');
     
@@ -261,19 +250,43 @@ function showResults(action, username, pineIds) {
     
     switch(action) {
         case 'validate':
-            content = `<p><strong>Username Validation:</strong> ${username}</p>`;
+            content = `
+                <p><strong>Username Validation:</strong> ${username}</p>
+                ${data.data && data.data.validuser ? 
+                    `<p class="text-success">✓ Valid username: ${data.data.verifiedUserName}</p>` : 
+                    `<p class="text-warning">⚠ Username not found</p>`
+                }
+            `;
             break;
         case 'check':
-            content = `<p><strong>Access Check:</strong> ${username}</p>
-                      <p><strong>Pine IDs:</strong> ${pineIds}</p>`;
+            content = `
+                <p><strong>Access Check:</strong> ${username}</p>
+                <p><strong>Pine IDs:</strong> ${pineIds}</p>
+                ${data.data ? `<p class="text-info">Checked ${data.data.length} script(s)</p>` : ''}
+            `;
             break;
         case 'grant':
-            content = `<p><strong>Access Granted:</strong> ${username}</p>
-                      <p><strong>Pine IDs:</strong> ${pineIds}</p>`;
+            content = `
+                <p><strong>Access Granted:</strong> ${username}</p>
+                <p><strong>Pine IDs:</strong> ${pineIds}</p>
+                ${data.data ? `
+                    <div class="mt-2">
+                        ${data.data.map(item => `
+                            <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                                <span class="text-monospace small">${item.pine_id}</span>
+                                <span class="badge bg-${item.status.includes('Success') ? 'success' : 'danger'}">${item.status}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            `;
             break;
         case 'remove':
-            content = `<p><strong>Access Removed:</strong> ${username}</p>
-                      <p><strong>Pine IDs:</strong> ${pineIds}</p>`;
+            content = `
+                <p><strong>Access Removed:</strong> ${username}</p>
+                <p><strong>Pine IDs:</strong> ${pineIds}</p>
+                ${data.data ? `<p class="text-info">Processed ${data.data.length} script(s)</p>` : ''}
+            `;
             break;
     }
     
