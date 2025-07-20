@@ -227,11 +227,17 @@ def add_pine_script():
         return redirect(url_for('main.index'))
     
     try:
-        # Check if script already exists
+        # Check if active script already exists, remove any inactive ones
         existing = PineScript.query.filter_by(pine_id=pine_id).first()
         if existing:
-            flash("Pine Script with this ID already exists", "warning")
-            return redirect(url_for('main.index'))
+            if existing.is_active:
+                flash("Pine Script with this ID already exists and is active", "warning")
+                return redirect(url_for('main.index'))
+            else:
+                # Remove inactive script with same ID to allow re-adding
+                db.session.delete(existing)
+                db.session.commit()
+                logger.info(f"Removed inactive Pine Script {pine_id} to allow re-adding")
         
         # Add new script
         script = PineScript(
