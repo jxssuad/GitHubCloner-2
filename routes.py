@@ -41,14 +41,23 @@ def admin_dashboard():
 def admin_generate_key():
     """Generate a new access key"""
     try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        name = data.get('name', '').strip()
+        
+        if not email or not name:
+            return jsonify({"success": False, "error": "Email and name are required"})
+        
         key_code = AccessKey.generate_key()
-        AccessKey.create(key_code)
+        AccessKey.create(key_code, email, name)
 
         total_keys = AccessKey.count()
 
         return jsonify({
             "success": True,
             "key": key_code,
+            "email": email,
+            "name": name,
             "total_keys": total_keys
         })
     except Exception as e:
