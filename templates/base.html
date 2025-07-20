@@ -15,32 +15,31 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
 </head>
 <body>
-    <!-- Navigation -->
+    <!-- Navigation (only show for authenticated pages) -->
+    {% if current_user and current_user.is_authenticated %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('main.admin') if current_user.is_admin else url_for('main.manage') }}">
                 <i class="fas fa-chart-line me-2"></i>
                 TradingView Access Manager
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    {% if request.endpoint == 'main.index' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.manage') }}">
-                            <i class="fas fa-users-cog me-1"></i>Manage Access
-                        </a>
-                    </li>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">
+                    <i class="fas fa-user me-1"></i>{{ current_user.name }}
+                    {% if current_user.is_admin %}
+                        <span class="badge bg-warning text-dark ms-1">Admin</span>
                     {% endif %}
-                </ul>
+                </span>
+                <a class="nav-link" href="{{ url_for('main.logout') }}">
+                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                </a>
             </div>
         </div>
     </nav>
+    {% endif %}
 
     <!-- Main Content -->
-    <main class="container mt-4">
+    <main {% if current_user and current_user.is_authenticated %}class="container-fluid mt-4"{% endif %}>
         <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -57,7 +56,7 @@
                                 {% elif category == 'info' %}
                                     <i class="fas fa-info-circle me-2"></i>
                                 {% endif %}
-                                {{ message }}
+                                {{ message|safe }}
                                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                             </div>
                         {% endfor %}

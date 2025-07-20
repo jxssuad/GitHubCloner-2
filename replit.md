@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a Flask-based web application designed to manage user access to TradingView Pine Scripts. The system provides a web interface for granting, removing, and monitoring access to specific Pine Scripts for TradingView users. It includes logging capabilities, session management, and a clean Bootstrap-based UI.
+This is a comprehensive Flask-based web application with advanced key-based authentication for managing TradingView Pine Script access. The system features a multi-tiered interface: admin panel for creating and managing access keys, user registration workflow through key validation, and comprehensive access control with one-user-per-account restrictions until full removal.
 
 ## User Preferences
 
@@ -11,28 +11,38 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Backend Architecture
-- **Framework**: Flask web framework with SQLAlchemy ORM
-- **Database**: SQLite by default with configurable database support via environment variables
+- **Framework**: Flask web framework with SQLAlchemy ORM and Flask-Login for authentication
+- **Database**: PostgreSQL with connection pooling and health checks
+- **Authentication**: Key-based access control with Flask-Login session management
+- **User Management**: Multi-tiered access system (admin/user roles)
 - **Session Management**: Flask sessions with proxy fix for deployment environments
 - **Configuration**: Environment-based configuration with dotenv support
 - **TradingView Integration**: Real authentication with session management and Pine Script access control
 
 ### Frontend Architecture
 - **Template Engine**: Jinja2 templates with Flask
-- **CSS Framework**: Bootstrap 5 with dark theme
+- **CSS Framework**: Bootstrap 5 with dark theme (Replit-themed)
 - **JavaScript**: Vanilla JavaScript with Bootstrap components and AJAX for form handling
 - **Icons**: Font Awesome for UI icons
-- **User Experience**: Non-refreshing interface with real-time feedback
+- **User Experience**: Multi-page authentication flow with real-time feedback
 
 ## Key Components
 
 ### Models (models.py)
-- **AccessLog**: Tracks all access management operations with timestamps, status, and details
+- **User**: Core user model with Flask-Login integration, admin flags, and TradingView username tracking
+- **AccessKey**: One-time use access keys created by admins for user registration
+- **AccessLog**: Tracks all access management operations with timestamps, status, and user attribution
 - **PineScript**: Stores Pine Script configurations including ID, name, description, and active status
+- **UserAccess**: Junction table tracking which users have access to which Pine Scripts
 
 ### Routes (routes.py)
-- **Dashboard Route** (`/`): Main overview page showing system status and recent activity
+- **Home Route** (`/`): Key entry portal for new users or login link for existing users
+- **Key Validation** (`/validate-key`): Validates access keys and initiates registration flow
+- **Registration** (`/register`): User account creation after key validation
+- **Login/Logout** (`/login`, `/logout`): Standard authentication endpoints
 - **Management Route** (`/manage`): User access management interface for granting/removing access
+- **Admin Panel** (`/admin`): Comprehensive admin interface for key creation and user management
+- **API Endpoints**: RESTful APIs for username validation, Pine Script management, and access control
 
 ### TradingView Integration (tradingview.py)
 - **TradingViewAPI Class**: Handles authentication and session management with TradingView
