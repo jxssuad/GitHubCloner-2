@@ -37,7 +37,7 @@ This guide walks you through deploying the TradingView Access Management system 
 
 Set these in your Render web service environment settings:
 
-### Required Variables
+### Required Variables (Set manually in Render dashboard)
 ```
 TRADINGVIEW_USERNAME=your_tradingview_username
 TRADINGVIEW_PASSWORD=your_tradingview_password
@@ -47,14 +47,11 @@ TRADINGVIEW_PASSWORD=your_tradingview_password
 ```
 DATABASE_URL=postgresql://...  (set automatically when you add PostgreSQL)
 PORT=10000                     (set automatically by Render)
+SESSION_SECRET=auto-generated   (generated automatically by render.yaml)
+LOG_LEVEL=INFO                 (set by render.yaml)
 ```
 
-### Optional Variables
-```
-SESSION_SECRET=auto-generated-by-render  (can be auto-generated)
-SESSION_TIMEOUT=3600                     (1 hour default)
-LOG_LEVEL=INFO                          (INFO default)
-```
+**Note**: The app is optimized for Render's environment system. Only manually add the TradingView credentials - everything else is handled automatically.
 
 ## Step-by-Step Deployment
 
