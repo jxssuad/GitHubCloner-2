@@ -49,16 +49,8 @@
                                 </div>
                             </div>
 
-                            <!-- Duration Selection -->
-                            <div class="mb-3">
-                                <label for="duration" class="form-label">Access Duration:</label>
-                                <select class="form-select" id="duration" name="duration">
-                                    <option value="7D">7 Days</option>
-                                    <option value="30D" selected>30 Days</option>
-                                    <option value="90D">90 Days</option>
-                                    <option value="1L">Lifetime</option>
-                                </select>
-                            </div>
+                            <!-- Duration Selection (Hidden - Always Lifetime) -->
+                            <input type="hidden" id="duration" name="duration" value="1L">
 
                             <button type="submit" class="btn btn-success" id="grant-btn">
                                 <i class="fas fa-plus-circle me-1"></i>Grant Access
@@ -86,7 +78,7 @@
                                             <i class="fas fa-minus-circle me-1"></i>Remove Access
                                         </button>
                                         <button type="button" class="btn btn-secondary ms-2" onclick="resetForm()">
-                                            <i class="fas fa-plus me-1"></i>Add Another User
+                                            <i class="fas fa-arrow-left me-1"></i>Manage Another User
                                         </button>
                                     </div>
                                 </div>
@@ -293,7 +285,7 @@ function grantAccess() {
                 statusUsernameEl.textContent = currentUsername;
             }
             if (statusDetailsEl) {
-                statusDetailsEl.textContent = `Access granted to ${selectedPineIds.length} Pine Script(s) for ${duration}`;
+                statusDetailsEl.textContent = `Lifetime access granted to ${selectedPineIds.length} Pine Script(s)`;
             }
             
             // Hide grant section, show status section
