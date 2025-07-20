@@ -75,8 +75,9 @@
                                 </div>
                                 <div>
                                     <a href="{{ url_for('main.toggle_pine_script', script_id=script.id) }}" 
-                                       class="btn btn-sm btn-outline-{{ 'success' if script.is_active else 'secondary' }}">
-                                        <i class="fas fa-{{ 'toggle-on' if script.is_active else 'toggle-off' }}"></i>
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('This will remove the Pine Script from the backend. You can add it again later if needed.')">
+                                        <i class="fas fa-trash"></i>
                                     </a>
                                 </div>
                             </div>

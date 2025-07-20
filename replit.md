@@ -115,3 +115,15 @@ Preferred communication style: Simple, everyday language.
 - **Problem**: Need responsive, professional interface
 - **Solution**: Bootstrap 5 with dark theme and Font Awesome icons
 - **Rationale**: Rapid development with consistent, modern UI components
+
+### Pine Script Management
+- **Problem**: Deactivated Pine Scripts caused re-adding issues
+- **Solution**: Complete removal from backend when turned off instead of soft deletion
+- **Rationale**: Prevents database conflicts and allows clean re-addition of scripts
+- **Date**: July 20, 2025
+
+### Real TradingView API Integration
+- **Problem**: Demo mode was not performing actual access management
+- **Solution**: Implemented real TradingView API endpoints (username_hint, pine_perm/add, pine_perm/list_users, pine_perm/remove)
+- **Rationale**: Provides genuine Pine Script access control with proper authentication
+- **Date**: July 20, 2025

@@ -252,14 +252,22 @@ def add_pine_script():
 
 @main_bp.route('/scripts/toggle/<int:script_id>')
 def toggle_pine_script(script_id):
-    """Toggle Pine Script active status"""
+    """Toggle Pine Script active status - removes from backend when turned off"""
     try:
         script = PineScript.query.get_or_404(script_id)
-        script.is_active = not script.is_active
-        db.session.commit()
         
-        status = "activated" if script.is_active else "deactivated"
-        flash(f"Pine Script '{script.name}' {status}", "success")
+        if script.is_active:
+            # If turning off, remove completely from backend
+            script_name = script.name
+            db.session.delete(script)
+            db.session.commit()
+            flash(f"Pine Script '{script_name}' removed from backend", "success")
+            logger.info(f"Pine Script {script.pine_id} ({script_name}) removed from backend")
+        else:
+            # If turning on (shouldn't happen since we delete inactive ones)
+            script.is_active = True
+            db.session.commit()
+            flash(f"Pine Script '{script.name}' activated", "success")
     
     except Exception as e:
         logger.error(f"Error toggling pine script: {e}")
