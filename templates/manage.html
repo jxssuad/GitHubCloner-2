@@ -199,13 +199,44 @@ function validateUsername() {
         
         if (data.success) {
             currentUsername = data.data.verifiedUserName;
-            document.getElementById('validated-username').value = currentUsername;
-            document.getElementById('validation-result').textContent = 
-                `Username "${currentUsername}" is valid and ready for access management.`;
+            
+            // Check if elements exist before trying to set their properties
+            const validatedUsernameEl = document.getElementById('validated-username');
+            const validationResultEl = document.getElementById('validation-result');
+            const usernameSectionEl = document.getElementById('username-section');
+            const grantSectionEl = document.getElementById('grant-section');
+            
+            console.log('Element check:', {
+                validatedUsername: !!validatedUsernameEl,
+                validationResult: !!validationResultEl,
+                usernameSection: !!usernameSectionEl,
+                grantSection: !!grantSectionEl
+            });
+            
+            if (validatedUsernameEl) {
+                validatedUsernameEl.value = currentUsername;
+            } else {
+                console.error('validated-username element not found');
+            }
+            
+            if (validationResultEl) {
+                validationResultEl.textContent = `Username "${currentUsername}" is valid and ready for access management.`;
+            } else {
+                console.error('validation-result element not found');
+            }
             
             // Hide username section, show grant section
-            document.getElementById('username-section').style.display = 'none';
-            document.getElementById('grant-section').style.display = 'block';
+            if (usernameSectionEl) {
+                usernameSectionEl.style.display = 'none';
+            } else {
+                console.error('username-section element not found');
+            }
+            
+            if (grantSectionEl) {
+                grantSectionEl.style.display = 'block';
+            } else {
+                console.error('grant-section element not found');
+            }
         } else {
             showAlert(data.message || 'Username validation failed', 'danger');
         }
