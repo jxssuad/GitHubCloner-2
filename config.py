@@ -1,9 +1,8 @@
+
 import os
 
-# Optimized for Render deployment - uses environment variables directly
-
 class Config:
-    """Configuration class for TradingView Access Management"""
+    """Configuration class for TradingView Access Management - Replit Optimized"""
     
     # TradingView credentials
     TRADINGVIEW_USERNAME = os.getenv("TRADINGVIEW_USERNAME", "")
@@ -21,17 +20,17 @@ class Config:
     # Logging configuration
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     
-    # Render deployment configuration
+    # Replit deployment configuration
     PORT = int(os.getenv("PORT", "5000"))
     
     @staticmethod
     def validate():
         """Validate required configuration"""
         if not Config.TRADINGVIEW_USERNAME or not Config.TRADINGVIEW_PASSWORD:
-            raise ValueError("TRADINGVIEW_USERNAME and TRADINGVIEW_PASSWORD must be set in environment variables")
+            raise ValueError("TRADINGVIEW_USERNAME and TRADINGVIEW_PASSWORD must be set in Secrets")
         return True
     
     @staticmethod
     def is_production():
-        """Check if running in production (Render)"""
-        return os.getenv('RENDER') is not None or os.getenv('DATABASE_URL', '').startswith('postgresql://')
+        """Check if running in production (Replit)"""
+        return os.getenv('REPL_ID') is not None
