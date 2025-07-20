@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: tradingview-access-manager
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 1 main:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tradingview-postgres
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: TRADINGVIEW_USERNAME
+        sync: false
+      - key: TRADINGVIEW_PASSWORD
+        sync: false
+        
+databases:
+  - name: tradingview-postgres
+    plan: free
