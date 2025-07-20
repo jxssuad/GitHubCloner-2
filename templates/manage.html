@@ -170,9 +170,13 @@ function toggleScript(pineId) {
 
 function validateUsername() {
     const username = document.getElementById('username').value.trim();
-    if (!username) return;
+    if (!username) {
+        showAlert('Please enter a username', 'warning');
+        return;
+    }
 
     showLoading(true);
+    console.log('Validating username:', username);
     
     fetch('/api/validate-username', {
         method: 'POST',
@@ -182,9 +186,16 @@ function validateUsername() {
         },
         body: JSON.stringify({ username: username })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         showLoading(false);
+        console.log('Validation response:', data);
         
         if (data.success) {
             currentUsername = data.data.verifiedUserName;
@@ -196,11 +207,12 @@ function validateUsername() {
             document.getElementById('username-section').style.display = 'none';
             document.getElementById('grant-section').style.display = 'block';
         } else {
-            showAlert(data.message, 'danger');
+            showAlert(data.message || 'Username validation failed', 'danger');
         }
     })
     .catch(error => {
         showLoading(false);
+        console.error('Validation error:', error);
         showAlert('Error validating username: ' + error.message, 'danger');
     });
 }
