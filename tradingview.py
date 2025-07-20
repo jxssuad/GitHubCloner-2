@@ -164,86 +164,97 @@ class TradingViewAPI:
             return False
     
     def validate_username(self, username):
-        """Validate if a TradingView username exists"""
+        """Validate if a TradingView username exists using real TradingView API"""
         try:
             if not self._ensure_authenticated():
                 return {"validuser": False, "verifiedUserName": ""}
             
-            # Use profile page check as it's more reliable
-            response = self.session.get(f"{self.base_url}/u/{username}/")
+            # Use TradingView's username hint API for accurate validation
+            hint_url = f"{self.base_url}/username_hint/?s={username}"
+            response = self.session.get(hint_url)
             
             if response.status_code == 200:
-                # Check if the page indicates a valid user
-                page_content = response.text.lower()
+                users_list = response.json()
+                valid_user = False
+                verified_name = ''
                 
-                # Look for indicators that the user exists
-                if ("page not found" not in page_content and 
-                    "user not found" not in page_content and
-                    "404" not in page_content and
-                    ("followers" in page_content or "following" in page_content or "ideas" in page_content)):
-                    
-                    # Try to extract the actual username from the page
-                    username_pattern = r'"username"\s*:\s*"([^"]+)"'
-                    username_match = re.search(username_pattern, response.text)
-                    verified_name = username_match.group(1) if username_match else username
-                    
-                    logger.info(f"Username validation successful: {verified_name}")
-                    return {"validuser": True, "verifiedUserName": verified_name}
-            
-            logger.warning(f"Username validation failed for: {username}")
-            return {"validuser": False, "verifiedUserName": ""}
+                for user in users_list:
+                    if user['username'].lower() == username.lower():
+                        valid_user = True
+                        verified_name = user['username']
+                        logger.info(f"Username validation successful: {verified_name}")
+                        return {"validuser": True, "verifiedUserName": verified_name}
+                
+                logger.warning(f"Username validation failed for: {username}")
+                return {"validuser": False, "verifiedUserName": ""}
+            else:
+                logger.error(f"Username hint API returned status: {response.status_code}")
+                return {"validuser": False, "verifiedUserName": ""}
             
         except Exception as e:
             logger.error(f"Username validation error: {e}")
             return {"validuser": False, "verifiedUserName": ""}
     
     def get_user_access(self, username, pine_ids):
-        """Get current access status for user and pine scripts"""
+        """Get current access status for user and pine scripts using real TradingView API"""
         try:
             if not self._ensure_authenticated():
                 return []
             
-            # Use TradingView's internal API to check access
-            api_url = f"{self.base_url}/pine_perm/get_user_access/"
-            
-            payload = {
-                'username': username,
-                'pine_ids': pine_ids
-            }
-            
-            headers = {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'Referer': f"{self.base_url}/"
-            }
-            
-            if self.csrf_token:
-                headers['X-CSRFToken'] = self.csrf_token
-            
-            response = self.session.post(
-                api_url,
-                json=payload,
-                headers=headers
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    return data
-                elif isinstance(data, dict) and 'access_info' in data:
-                    return data['access_info']
-            
-            # If API call fails, return default structure
             results = []
             for pine_id in pine_ids:
-                access_info = {
+                # Use TradingView's list_users API to check access
+                list_users_url = f"{self.base_url}/pine_perm/list_users/?limit=10&order_by=-created"
+                
+                from urllib3 import encode_multipart_formdata
+                payload = {
+                    'pine_id': pine_id,
+                    'username': username
+                }
+                
+                body, content_type = encode_multipart_formdata(payload)
+                
+                headers = {
+                    'Origin': self.base_url,
+                    'Content-Type': content_type,
+                    'Cookie': f'sessionid={self._get_session_id()}',
+                    'Referer': f"{self.base_url}/"
+                }
+                
+                response = self.session.post(
+                    list_users_url,
+                    data=body,
+                    headers=headers
+                )
+                
+                access_details = {
                     "pine_id": pine_id,
                     "username": username,
                     "hasAccess": False,
                     "noExpiration": False,
                     "currentExpiration": datetime.now().isoformat()
                 }
-                results.append(access_info)
+                
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                        users = data.get('results', [])
+                        
+                        for user in users:
+                            if user['username'].lower() == username.lower():
+                                access_details['hasAccess'] = True
+                                str_expiration = user.get("expiration")
+                                if str_expiration is not None:
+                                    access_details['currentExpiration'] = user['expiration']
+                                    access_details['noExpiration'] = False
+                                else:
+                                    access_details['noExpiration'] = True
+                                break
+                                
+                    except Exception as e:
+                        logger.error(f"Error parsing access data for {pine_id}: {e}")
+                
+                results.append(access_details)
             
             return results
             
@@ -261,26 +272,66 @@ class TradingViewAPI:
             
             results = []
             for pine_id in pine_ids:
-                # Log the attempt
                 logger.info(f"Processing grant access for {username} to {pine_id}")
                 
-                # Since the exact TradingView API endpoints may vary, 
-                # we'll simulate the functionality but log that it was attempted
-                # This provides a working demonstration while acknowledging the real integration needs
+                # Use real TradingView Pine permission API endpoints
+                add_access_url = f"{self.base_url}/pine_perm/add/"
+                
+                # Prepare multipart form data as required by TradingView
+                from urllib3 import encode_multipart_formdata
+                
+                payload = {
+                    'pine_id': pine_id,
+                    'username_recip': username
+                }
+                
+                # Add expiration if not lifetime
+                if duration != "1L":
+                    # Convert duration to expiration date
+                    expiration_date = self._calculate_expiration(duration)
+                    if expiration_date:
+                        payload['expiration'] = expiration_date
+                
+                body, content_type = encode_multipart_formdata(payload)
+                
+                headers = {
+                    'Origin': self.base_url,
+                    'Content-Type': content_type,
+                    'Cookie': f'sessionid={self._get_session_id()}',
+                    'Referer': f"{self.base_url}/"
+                }
+                
+                response = self.session.post(
+                    add_access_url,
+                    data=body,
+                    headers=headers
+                )
+                
+                logger.debug(f"Grant access API response: {response.status_code}")
                 
                 access_result = {
                     "pine_id": pine_id,
                     "username": username,
-                    "hasAccess": True,
+                    "hasAccess": False,
                     "noExpiration": duration == "1L",
-                    "currentExpiration": (datetime.now() + timedelta(days=365)).isoformat(),
+                    "currentExpiration": datetime.now().isoformat(),
                     "expiration": (datetime.now() + timedelta(days=365)).isoformat(),
-                    "status": "Success - Demo Mode (Authentication Working)"
+                    "status": "Failed"
                 }
                 
+                # HTTP 200 (OK) and 201 (Created) both indicate success
+                if response.status_code in [200, 201]:
+                    access_result.update({
+                        "hasAccess": True,
+                        "status": "Success"
+                    })
+                    logger.info(f"Successfully granted access for {username} to {pine_id}")
+                else:
+                    access_result["status"] = f"Failed: HTTP {response.status_code}"
+                    logger.error(f"Grant access failed with status {response.status_code}")
+                
                 results.append(access_result)
-                logger.info(f"Grant access logged for {username} to {pine_id}")
-                time.sleep(0.2)  # Small delay to simulate processing
+                time.sleep(0.1)  # Small delay between requests
             
             return results
             
@@ -289,79 +340,54 @@ class TradingViewAPI:
             return []
     
     def remove_access(self, username, pine_ids):
-        """Remove access from user for specified pine scripts"""
+        """Remove access from user for specified pine scripts using real TradingView API"""
         try:
             if not self._ensure_authenticated():
                 return []
             
-            # Use TradingView's internal API to remove access
-            api_url = f"{self.base_url}/pine_perm/delete_expiration/"
-            
             results = []
             for pine_id in pine_ids:
+                # Use TradingView's remove access API
+                remove_url = f"{self.base_url}/pine_perm/remove/"
+                
+                from urllib3 import encode_multipart_formdata
                 payload = {
-                    'username': username,
-                    'pine_id': pine_id
+                    'pine_id': pine_id,
+                    'username_recip': username
                 }
                 
+                body, content_type = encode_multipart_formdata(payload)
+                
                 headers = {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
+                    'Origin': self.base_url,
+                    'Content-Type': content_type,
+                    'Cookie': f'sessionid={self._get_session_id()}',
                     'Referer': f"{self.base_url}/"
                 }
                 
-                if self.csrf_token:
-                    headers['X-CSRFToken'] = self.csrf_token
-                
                 response = self.session.post(
-                    api_url,
-                    json=payload,
+                    remove_url,
+                    data=body,
                     headers=headers
                 )
                 
+                access_result = {
+                    "pine_id": pine_id,
+                    "username": username,
+                    "hasAccess": True,  # Assume had access before removal
+                    "noExpiration": False,
+                    "currentExpiration": datetime.now().isoformat(),
+                    "status": "Success" if response.status_code == 200 else f"Failed: HTTP {response.status_code}"
+                }
+                
                 if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        if data.get('success', False):
-                            access_result = {
-                                "pine_id": pine_id,
-                                "username": username,
-                                "hasAccess": False,
-                                "noExpiration": False,
-                                "currentExpiration": datetime.now().isoformat(),
-                                "status": "Success"
-                            }
-                        else:
-                            access_result = {
-                                "pine_id": pine_id,
-                                "username": username,
-                                "hasAccess": True,
-                                "noExpiration": False,
-                                "currentExpiration": datetime.now().isoformat(),
-                                "status": data.get('error', 'Failed')
-                            }
-                    except json.JSONDecodeError:
-                        # Handle non-JSON response
-                        access_result = {
-                            "pine_id": pine_id,
-                            "username": username,
-                            "hasAccess": False,
-                            "noExpiration": False,
-                            "currentExpiration": datetime.now().isoformat(),
-                            "status": "Success"
-                        }
+                    access_result["hasAccess"] = False  # Access removed successfully
+                    logger.info(f"Successfully removed access for {username} from {pine_id}")
                 else:
-                    access_result = {
-                        "pine_id": pine_id,
-                        "username": username,
-                        "hasAccess": True,
-                        "noExpiration": False,
-                        "currentExpiration": datetime.now().isoformat(),
-                        "status": f"HTTP {response.status_code}"
-                    }
+                    logger.error(f"Failed to remove access for {username} from {pine_id}: {response.status_code}")
                 
                 results.append(access_result)
-                time.sleep(0.5)  # Rate limiting
+                time.sleep(0.2)  # Rate limiting
             
             return results
             
@@ -381,6 +407,72 @@ class TradingViewAPI:
         
         # Session invalid, re-authenticate
         return self._authenticate()
+    
+    def _get_fresh_csrf_token(self):
+        """Get a fresh CSRF token from the current session"""
+        try:
+            # Get CSRF token from chart page
+            response = self.session.get(f"{self.base_url}/chart/")
+            if response.status_code == 200:
+                csrf_patterns = [
+                    r'window\.__csrfToken\s*=\s*["\']([^"\']+)["\']',
+                    r'csrfToken["\']?\s*:\s*["\']([^"\']+)["\']',
+                    r'csrf_token["\']?\s*:\s*["\']([^"\']+)["\']',
+                    r'authenticity_token["\']?\s*["\']([^"\']+)["\']'
+                ]
+                
+                for pattern in csrf_patterns:
+                    match = re.search(pattern, response.text)
+                    if match:
+                        self.csrf_token = match.group(1)
+                        logger.debug("Fresh CSRF token extracted")
+                        return self.csrf_token
+                
+                # Also check cookies for CSRF token
+                for cookie in self.session.cookies:
+                    if 'csrf' in cookie.name.lower():
+                        self.csrf_token = cookie.value
+                        logger.debug(f"CSRF token found in cookie: {cookie.name}")
+                        return self.csrf_token
+                        
+        except Exception as e:
+            logger.debug(f"Error getting fresh CSRF token: {e}")
+        
+        return None
+    
+    def _get_session_id(self):
+        """Get session ID from cookies"""
+        for cookie in self.session.cookies:
+            if cookie.name == 'sessionid':
+                return cookie.value
+        return None
+    
+    def _calculate_expiration(self, duration):
+        """Calculate expiration date from duration string (e.g., '7D', '2M', '1L')"""
+        try:
+            if duration == "1L":
+                return None  # Lifetime access
+            
+            from datetime import datetime, timedelta
+            
+            if duration.endswith('D'):
+                days = int(duration[:-1])
+                expiration = datetime.now() + timedelta(days=days)
+            elif duration.endswith('M'):
+                months = int(duration[:-1])
+                expiration = datetime.now() + timedelta(days=months * 30)
+            elif duration.endswith('Y'):
+                years = int(duration[:-1])
+                expiration = datetime.now() + timedelta(days=years * 365)
+            else:
+                # Default to 30 days if format not recognized
+                expiration = datetime.now() + timedelta(days=30)
+            
+            return expiration.strftime('%Y-%m-%d %H:%M:%S')
+            
+        except Exception as e:
+            logger.error(f"Error calculating expiration: {e}")
+            return None
 
 # Global API instance
 tv_api = TradingViewAPI()
