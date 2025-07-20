@@ -18,7 +18,7 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+            <a class="navbar-brand" href="/admin">
                 <i class="fas fa-chart-line me-2"></i>
                 TradingView Access Manager
             </a>
@@ -27,13 +27,16 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    {% if request.endpoint == 'main.index' %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.manage') }}">
-                            <i class="fas fa-users-cog me-1"></i>Manage Access
+                        <a class="nav-link" href="/admin">
+                            <i class="fas fa-crown me-1"></i>Admin
                         </a>
                     </li>
-                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/access">
+                            <i class="fas fa-key me-1"></i>Access
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>

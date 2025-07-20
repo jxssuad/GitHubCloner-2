@@ -36,11 +36,9 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # initialize the app with the extension
 db.init_app(app)
 
-# Import and register routes
-from routes import main_bp
-app.register_blueprint(main_bp)
-
 with app.app_context():
     # Make sure to import the models here or their tables won't be created
     import models  # noqa: F401
+    import routes  # noqa: F401
+    
     db.create_all()

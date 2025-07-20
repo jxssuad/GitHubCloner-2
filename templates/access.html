@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Access Pine Scripts - TradingView Access Manager{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            
+            {% if not session.get('access_key_used') %}
+            <!-- Key Entry Form -->
+            <div class="card shadow-sm">
+                <div class="card-header text-center">
+                    <h3><i class="fas fa-key text-primary me-2"></i>Enter Access Key</h3>
+                    <p class="text-muted mb-0">Enter your one-time access key to get TradingView Pine Script access</p>
+                </div>
+                <div class="card-body">
+                    <form id="keyForm">
+                        <div class="mb-3">
+                            <label for="accessKey" class="form-label">Access Key</label>
+                            <input type="text" class="form-control form-control-lg text-center" id="accessKey" 
+                                   placeholder="Enter 8-character key" maxlength="8" style="letter-spacing: 2px; font-family: monospace;">
+                            <div class="form-text">Enter the 8-character access key provided by the administrator</div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-unlock me-2"></i>Validate Key
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="keyError" class="alert alert-danger mt-3 d-none"></div>
+                </div>
+            </div>
+            
+            {% else %}
+            <!-- Username Entry Form -->
+            <div class="card shadow-sm">
+                <div class="card-header text-center">
+                    <h3><i class="fas fa-user text-success me-2"></i>TradingView Username</h3>
+                    <p class="text-muted mb-0">Enter your TradingView username to get Pine Script access</p>
+                </div>
+                <div class="card-body">
+                    {% if session.get('username') %}
+                    <!-- Show current username and allow change -->
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Current username: <strong>{{ session.get('username') }}</strong>
+                        <button class="btn btn-sm btn-outline-primary ms-2" onclick="changeUsername()">Change</button>
+                    </div>
+                    {% endif %}
+                    
+                    <form id="usernameForm" {% if session.get('username') %}class="d-none"{% endif %}>
+                        <div class="mb-3">
+                            <label for="tradingviewUsername" class="form-label">TradingView Username</label>
+                            <input type="text" class="form-control form-control-lg" id="tradingviewUsername" 
+                                   placeholder="Enter your TradingView username" value="{{ session.get('username', '') }}">
+                            <div class="form-text">Your exact TradingView username (case-sensitive)</div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-check me-2"></i>Validate Username
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="usernameError" class="alert alert-danger mt-3 d-none"></div>
+                    <div id="usernameSuccess" class="alert alert-success mt-3 d-none"></div>
+                </div>
+            </div>
+            
+            {% if session.get('username_valid') %}
+            <!-- Pine Script Selection -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-code text-warning me-2"></i>Available Pine Scripts</h5>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAll()">
+                        <i class="fas fa-check-square me-1"></i>Select All
+                    </button>
+                </div>
+                <div class="card-body">
+                    <form id="accessForm">
+                        <div class="row">
+                            {% for script in scripts %}
+                            <div class="col-md-6 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input script-checkbox" type="checkbox" 
+                                           value="{{ script.pine_id }}" id="script{{ loop.index }}">
+                                    <label class="form-check-label" for="script{{ loop.index }}">
+                                        <strong>{{ script.name }}</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="d-grid mt-3">
+                            <button type="submit" class="btn btn-warning btn-lg">
+                                <i class="fas fa-crown me-2"></i>Grant Access to Selected Scripts
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="accessResult" class="mt-3"></div>
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+            
+        </div>
+    </div>
+</div>
+
+<script>
+let allSelected = false;
+
+// Handle key validation
+document.getElementById('keyForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const key = document.getElementById('accessKey').value.trim().toUpperCase();
+    const errorDiv = document.getElementById('keyError');
+    
+    if (key.length !== 8) {
+        errorDiv.textContent = 'Access key must be 8 characters long';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    fetch('/access/validate-key', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({key: key})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            errorDiv.textContent = data.error;
+            errorDiv.classList.remove('d-none');
+        }
+    });
+});
+
+// Handle username validation
+document.getElementById('usernameForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('tradingviewUsername').value.trim();
+    const errorDiv = document.getElementById('usernameError');
+    const successDiv = document.getElementById('usernameSuccess');
+    
+    errorDiv.classList.add('d-none');
+    successDiv.classList.add('d-none');
+    
+    if (!username) {
+        errorDiv.textContent = 'Please enter your TradingView username';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    // Show loading state
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Validating...';
+    submitBtn.disabled = true;
+    
+    fetch('/access/validate-username', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: username})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            successDiv.textContent = 'Username validated successfully!';
+            successDiv.classList.remove('d-none');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            errorDiv.textContent = data.error;
+            errorDiv.classList.remove('d-none');
+        }
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// Handle access form
+document.getElementById('accessForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const checkboxes = document.querySelectorAll('.script-checkbox:checked');
+    const selectedScripts = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedScripts.length === 0) {
+        alert('Please select at least one Pine Script');
+        return;
+    }
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Granting Access...';
+    submitBtn.disabled = true;
+    
+    fetch('/access/grant-access', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({scripts: selectedScripts})
+    })
+    .then(response => response.json())
+    .then(data => {
+        const resultDiv = document.getElementById('accessResult');
+        
+        if (data.success) {
+            let html = '<div class="alert alert-success"><h6>Access Granted Successfully!</h6><ul class="mb-0">';
+            data.results.forEach(result => {
+                if (result.success) {
+                    html += `<li><i class="fas fa-check text-success me-1"></i>${result.script_name}</li>`;
+                }
+            });
+            html += '</ul></div>';
+            
+            if (data.errors && data.errors.length > 0) {
+                html += '<div class="alert alert-warning"><h6>Some Errors Occurred:</h6><ul class="mb-0">';
+                data.errors.forEach(error => {
+                    html += `<li><i class="fas fa-exclamation-triangle text-warning me-1"></i>${error.script_name}: ${error.error}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            resultDiv.innerHTML = html;
+            
+            // Disable form after successful access
+            document.getElementById('accessForm').style.display = 'none';
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        }
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+function toggleSelectAll() {
+    const checkboxes = document.querySelectorAll('.script-checkbox');
+    allSelected = !allSelected;
+    
+    checkboxes.forEach(cb => {
+        cb.checked = allSelected;
+    });
+    
+    const btn = event.target.closest('button');
+    btn.innerHTML = allSelected 
+        ? '<i class="fas fa-square me-1"></i>Deselect All'
+        : '<i class="fas fa-check-square me-1"></i>Select All';
+}
+
+function changeUsername() {
+    document.getElementById('usernameForm').classList.remove('d-none');
+    document.querySelector('.alert-info').style.display = 'none';
+}
+
+// Auto-uppercase key input
+document.getElementById('accessKey')?.addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase();
+});
+</script>
+{% endblock %}

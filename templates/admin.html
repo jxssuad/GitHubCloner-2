@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - TradingView Access Manager{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1><i class="fas fa-crown text-warning me-2"></i>Admin Dashboard</h1>
+            <p class="text-muted">Manage Pine Scripts, create access keys, and monitor user access</p>
+        </div>
+    </div>
+
+    <!-- Key Management Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-key me-2"></i>Access Key Management</h5>
+                </div>
+                <div class="card-body">
+                    <button id="generateKeyBtn" class="btn btn-primary mb-3">
+                        <i class="fas fa-plus me-2"></i>Generate New Access Key
+                    </button>
+                    
+                    <div id="newKeyAlert" class="alert alert-success d-none" role="alert">
+                        <h6>New Access Key Generated:</h6>
+                        <div class="d-flex align-items-center">
+                            <code id="newKeyCode" class="fs-5 me-3"></code>
+                            <button class="btn btn-sm btn-outline-success" onclick="copyKey()">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar me-2"></i>Quick Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="h4 mb-0" id="totalKeys">{{ total_keys }}</div>
+                            <small class="text-muted">Total Keys</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="h4 mb-0" id="usedKeys">{{ used_keys }}</div>
+                            <small class="text-muted">Used Keys</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="h4 mb-0" id="totalAccess">{{ total_access }}</div>
+                            <small class="text-muted">Total Access</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pine Scripts Management -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-code me-2"></i>Pine Scripts Management</h5>
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addScriptModal">
+                        <i class="fas fa-plus me-1"></i>Add Script
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Script ID</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scriptsTable">
+                                {% for script in scripts %}
+                                <tr>
+                                    <td><strong>{{ script.name }}</strong></td>
+                                    <td><code>{{ script.pine_id }}</code></td>
+                                    <td>
+                                        <span class="badge bg-{% if script.is_active %}success{% else %}secondary{% endif %}">
+                                            {% if script.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>{{ script.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeScript('{{ script.pine_id }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Access Keys Table -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list me-2"></i>Access Keys & Generated Access</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Used By</th>
+                                    <th>Used At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="keysTable">
+                                {% for key in access_keys %}
+                                <tr>
+                                    <td><code>{{ key.key_code }}</code></td>
+                                    <td>
+                                        <span class="badge bg-{% if key.is_used %}danger{% else %}success{% endif %}">
+                                            {% if key.is_used %}Used{% else %}Available{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>{{ key.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        {% if key.used_by_username %}
+                                            <strong>{{ key.used_by_username }}</strong>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if key.used_at %}
+                                            {{ key.used_at.strftime('%Y-%m-%d %H:%M') }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if key.is_used %}
+                                            <button class="btn btn-sm btn-outline-primary" onclick="manageKeyAccess('{{ key.key_code }}', '{{ key.used_by_username }}')">
+                                                <i class="fas fa-cog me-1"></i>Manage
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Script Modal -->
+<div class="modal fade" id="addScriptModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Pine Script</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addScriptForm">
+                    <div class="mb-3">
+                        <label for="scriptName" class="form-label">Script Name</label>
+                        <input type="text" class="form-control" id="scriptName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="scriptId" class="form-label">Script ID</label>
+                        <input type="text" class="form-control" id="scriptId" placeholder="PUB;xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" required>
+                        <div class="form-text">Format: PUB;followed by the script identifier</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="scriptDescription" class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" id="scriptDescription" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addScript()">Add Script</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Key Access Modal -->
+<div class="modal fade" id="manageAccessModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Access for <span id="manageUsername"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="userAccessList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Generate new access key
+document.getElementById('generateKeyBtn').addEventListener('click', function() {
+    fetch('/admin/generate-key', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('newKeyCode').textContent = data.key;
+            document.getElementById('newKeyAlert').classList.remove('d-none');
+            
+            // Update stats
+            document.getElementById('totalKeys').textContent = data.total_keys;
+            
+            // Add to table
+            location.reload(); // Simple reload for now
+        } else {
+            alert('Error generating key: ' + data.error);
+        }
+    });
+});
+
+function copyKey() {
+    const keyCode = document.getElementById('newKeyCode').textContent;
+    navigator.clipboard.writeText(keyCode);
+    
+    // Change button text temporarily
+    const btn = event.target.closest('button');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+    setTimeout(() => {
+        btn.innerHTML = originalHTML;
+    }, 2000);
+}
+
+function addScript() {
+    const name = document.getElementById('scriptName').value;
+    const scriptId = document.getElementById('scriptId').value;
+    const description = document.getElementById('scriptDescription').value;
+    
+    fetch('/admin/add-script', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: name,
+            script_id: scriptId,
+            description: description
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error adding script: ' + data.error);
+        }
+    });
+}
+
+function removeScript(scriptId) {
+    if (confirm('Are you sure you want to remove this script?')) {
+        fetch('/admin/remove-script', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({script_id: scriptId})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error removing script: ' + data.error);
+            }
+        });
+    }
+}
+
+function manageKeyAccess(keyCode, username) {
+    document.getElementById('manageUsername').textContent = username;
+    
+    fetch(`/admin/key-access/${keyCode}`)
+    .then(response => response.json())
+    .then(data => {
+        const accessList = document.getElementById('userAccessList');
+        
+        if (data.access_logs && data.access_logs.length > 0) {
+            let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Script</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>';
+            
+            data.access_logs.forEach(log => {
+                html += `
+                    <tr>
+                        <td><strong>${log.pine_script_name}</strong></td>
+                        <td><span class="badge bg-${log.status === 'success' ? 'success' : 'danger'}">${log.status}</span></td>
+                        <td>${new Date(log.timestamp).toLocaleString()}</td>
+                        <td>
+                            ${log.status === 'success' && log.operation === 'grant' ? 
+                                `<button class="btn btn-sm btn-outline-danger" onclick="removeUserAccess('${username}', '${log.pine_id}')">
+                                    <i class="fas fa-times me-1"></i>Remove
+                                </button>` : 
+                                '<span class="text-muted">-</span>'
+                            }
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+            accessList.innerHTML = html;
+        } else {
+            accessList.innerHTML = '<p class="text-muted">No access granted yet.</p>';
+        }
+        
+        new bootstrap.Modal(document.getElementById('manageAccessModal')).show();
+    });
+}
+
+function removeUserAccess(username, pineId) {
+    if (confirm('Remove access for this user?')) {
+        fetch('/admin/remove-user-access', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: username,
+                pine_id: pineId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Access removed successfully');
+                location.reload();
+            } else {
+                alert('Error removing access: ' + data.error);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

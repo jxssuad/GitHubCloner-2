@@ -27,12 +27,14 @@ Preferred communication style: Simple, everyday language.
 ## Key Components
 
 ### Models (models.py)
-- **AccessLog**: Tracks all access management operations with timestamps, status, and details
+- **AccessKey**: Stores one-time access keys with usage tracking and user relationships
+- **AccessLog**: Tracks all access management operations with timestamps, status, and details, linked to access keys
 - **PineScript**: Stores Pine Script configurations including ID, name, description, and active status
 
 ### Routes (routes.py)
-- **Dashboard Route** (`/`): Main overview page showing system status and recent activity
-- **Management Route** (`/manage`): User access management interface for granting/removing access
+- **Admin Routes** (`/admin`): Administrator dashboard for key management, Pine Script management, and access monitoring
+- **Access Routes** (`/access`): User interface for key validation, username entry, and Pine Script access
+- **API Routes**: Key validation, username validation, access granting, and administrative operations
 
 ### TradingView Integration (tradingview.py)
 - **TradingViewAPI Class**: Handles authentication and session management with TradingView
@@ -142,4 +144,17 @@ Preferred communication style: Simple, everyday language.
 - **Solution**: Added comprehensive Render deployment files and database URL handling
 - **Files**: render.yaml, Procfile, runtime.txt, .env.example, DEPLOYMENT.md, RENDER_SETUP.md
 - **Features**: PostgreSQL support, environment-based secrets, production configurations
+- **Date**: July 20, 2025
+
+### Complete Architecture Separation with Key-Based Authentication
+- **Problem**: User requested complete separation of admin and user interfaces with key-based access control
+- **Solution**: Restructured entire application with /admin dashboard and /access user page, implemented one-time key system
+- **Features**: 
+  - /admin dashboard for administrators with key generation, script management, and access monitoring
+  - /access page for users with key validation and script selection
+  - One-time access keys that can only be used once
+  - Manage functionality for each key to view and remove granted access
+  - Default Pine Scripts auto-loaded (11 popular scripts including Ultraalgo, luxalgo, etc.)
+- **Database Changes**: Added AccessKey model with relationships to AccessLog
+- **UI Changes**: Completely new admin.html and access.html templates with premium styling
 - **Date**: July 20, 2025
