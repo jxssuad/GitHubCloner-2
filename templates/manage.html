@@ -1,297 +1,336 @@
 {% extends "base.html" %}
 
-{% block title %}Manage Access - TradingView Access Management{% endblock %}
+{% block title %}Manage Access{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-lg-8 mx-auto">
-        <div class="card">
-            <div class="card-header">
-                <h4 class="mb-0">
-                    <i class="fas fa-users-cog me-2"></i>
-                    User Access Management
-                </h4>
-            </div>
-            <div class="card-body">
-                <form id="accessForm">
-                    <!-- Username Input -->
-                    <div class="mb-4">
-                        <label for="username" class="form-label">
-                            <i class="fas fa-user me-2"></i>TradingView Username
-                        </label>
-                        <input type="text" class="form-control" id="username" name="username" 
-                               placeholder="Enter TradingView username" required>
-                        <div class="form-text">
-                            Enter the exact TradingView username (case-sensitive).
-                        </div>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-users me-2"></i>
+                        TradingView Access Management
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Step 1: Username Input -->
+                    <div id="username-section">
+                        <h5>Enter TradingView Username</h5>
+                        <form id="username-form">
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       placeholder="Enter TradingView username" required>
+                                <button class="btn btn-primary" type="submit" id="validate-btn">
+                                    <i class="fas fa-check me-1"></i>Validate
+                                </button>
+                            </div>
+                        </form>
                     </div>
 
-                    <!-- Pine Script IDs -->
-                    <div class="mb-4">
-                        <label for="pine_ids" class="form-label">
-                            <i class="fas fa-code me-2"></i>Pine Script IDs
-                        </label>
-                        <textarea class="form-control" id="pine_ids" name="pine_ids" rows="3" 
-                                  placeholder="PUB;xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,PUB;yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy">{{ default_pine_ids }}</textarea>
-                        <div class="form-text">
-                            Enter Pine Script IDs separated by commas. Find these in browser developer tools.
-                        </div>
+                    <!-- Step 2: Username Validated - Show Grant Access -->
+                    <div id="grant-section" style="display: none;">
+                        <div class="alert alert-success" id="validation-result"></div>
                         
-                        {% if pine_scripts %}
-                            <div class="mt-2">
-                                <small class="text-muted">Configured Scripts:</small>
-                                <div class="mt-1">
-                                    {% for script in pine_scripts %}
-                                        <button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1" 
-                                                onclick="addPineId('{{ script.pine_id }}')">
-                                            {{ script.name }}
-                                        </button>
-                                    {% endfor %}
+                        <h5>Select Pine Scripts & Grant Access</h5>
+                        <form id="grant-form">
+                            <input type="hidden" id="validated-username" name="username">
+                            
+                            <!-- Pine Scripts Selection -->
+                            <div class="mb-3">
+                                <label class="form-label">Select Pine Scripts:</label>
+                                <div class="row" id="pine-scripts-list">
+                                    <!-- Scripts will be loaded here -->
                                 </div>
                             </div>
-                        {% endif %}
+
+                            <!-- Duration Selection -->
+                            <div class="mb-3">
+                                <label for="duration" class="form-label">Access Duration:</label>
+                                <select class="form-select" id="duration" name="duration">
+                                    <option value="7D">7 Days</option>
+                                    <option value="30D" selected>30 Days</option>
+                                    <option value="90D">90 Days</option>
+                                    <option value="1L">Lifetime</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-success" id="grant-btn">
+                                <i class="fas fa-plus-circle me-1"></i>Grant Access
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="resetForm()">
+                                <i class="fas fa-arrow-left me-1"></i>Back
+                            </button>
+                        </form>
                     </div>
 
-                    <!-- Action Buttons -->
-                    <div class="row">
-                        <div class="col-md-3 mb-2">
-                            <button type="button" onclick="performAction('validate')" 
-                                    class="btn btn-info w-100" id="validateBtn">
-                                <i class="fas fa-check me-2"></i>Validate User
-                            </button>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <button type="button" onclick="performAction('check')" 
-                                    class="btn btn-secondary w-100" id="checkBtn">
-                                <i class="fas fa-search me-2"></i>Check Access
-                            </button>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <button type="button" onclick="performAction('grant')" 
-                                    class="btn btn-success w-100" id="grantBtn">
-                                <i class="fas fa-plus-circle me-2"></i>Grant Access
-                            </button>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <button type="button" onclick="performAction('remove')" 
-                                    class="btn btn-danger w-100" id="removeBtn">
-                                <i class="fas fa-minus-circle me-2"></i>Remove Access
-                            </button>
+                    <!-- Step 3: Access Granted - Show Status -->
+                    <div id="status-section" style="display: none;">
+                        <div class="alert alert-success" id="grant-result"></div>
+                        
+                        <h5>Current Access Status</h5>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1" id="status-username"></h6>
+                                        <small class="text-muted" id="status-details"></small>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-danger" onclick="removeAllAccess()">
+                                            <i class="fas fa-minus-circle me-1"></i>Remove Access
+                                        </button>
+                                        <button type="button" class="btn btn-secondary ms-2" onclick="resetForm()">
+                                            <i class="fas fa-plus me-1"></i>Add Another User
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </form>
 
-                <!-- Results Section -->
-                <div id="resultsSection" class="mt-4" style="display: none;">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="mb-0">
-                                <i class="fas fa-list-alt me-2"></i>Results
-                            </h5>
+                    <!-- Loading indicator -->
+                    <div id="loading" style="display: none;" class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
                         </div>
-                        <div class="card-body">
-                            <div id="resultsContent"></div>
-                        </div>
+                        <p class="mt-2">Processing...</p>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Instructions -->
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-question-circle me-2"></i>
-                    Instructions
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-user me-2"></i>Username Management</h6>
-                        <ul class="list-unstyled">
-                            <li><i class="fas fa-check text-success me-2"></i><strong>Validate User:</strong> Verify username exists</li>
-                            <li><i class="fas fa-search text-secondary me-2"></i><strong>Check Access:</strong> View current permissions</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-cog me-2"></i>Access Control</h6>
-                        <ul class="list-unstyled">
-                            <li><i class="fas fa-plus-circle text-success me-2"></i><strong>Grant Access:</strong> Add user permissions</li>
-                            <li><i class="fas fa-minus-circle text-danger me-2"></i><strong>Remove Access:</strong> Revoke user permissions</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="mt-3 p-3 bg-dark rounded">
-                    <h6><i class="fas fa-code me-2"></i>Finding Pine Script IDs</h6>
-                    <p class="mb-2 small">To find Pine Script IDs:</p>
-                    <ol class="small mb-0">
-                        <li>Open your TradingView script page</li>
-                        <li>Open browser Developer Tools (F12)</li>
-                        <li>Look for requests containing "PUB;" followed by a 32-character ID</li>
-                        <li>Copy the full ID including "PUB;" prefix</li>
-                    </ol>
+                    <!-- Alert container -->
+                    <div id="alert-container"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-function addPineId(pineId) {
-    const textarea = document.getElementById('pine_ids');
-    const currentValue = textarea.value.trim();
-    
-    if (currentValue === '') {
-        textarea.value = pineId;
-    } else {
-        // Check if ID already exists
-        if (!currentValue.includes(pineId)) {
-            textarea.value = currentValue + ',' + pineId;
-        }
-    }
-    
-    // Focus back to textarea
-    textarea.focus();
+let currentUsername = '';
+let selectedPineIds = [];
+
+// Load pine scripts on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadPineScripts();
+});
+
+// Username validation
+document.getElementById('username-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    validateUsername();
+});
+
+// Grant access form
+document.getElementById('grant-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    grantAccess();
+});
+
+function loadPineScripts() {
+    fetch('/api/pine-scripts')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('pine-scripts-list');
+            container.innerHTML = '';
+            
+            data.scripts.forEach(script => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 mb-2';
+                col.innerHTML = `
+                    <div class="form-check pine-script-item" data-pine-id="${script.pine_id}">
+                        <input class="form-check-input" type="checkbox" value="${script.pine_id}" 
+                               id="script-${script.id}" onchange="toggleScript('${script.pine_id}')">
+                        <label class="form-check-label" for="script-${script.id}">
+                            <strong>${script.name}</strong>
+                            <br><small class="text-muted">${script.description || ''}</small>
+                        </label>
+                        <i class="fas fa-check-circle text-success ms-2" style="display: none;"></i>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
+        })
+        .catch(error => {
+            showAlert('Error loading Pine Scripts: ' + error.message, 'danger');
+        });
 }
 
-function performAction(action) {
+function toggleScript(pineId) {
+    const checkbox = document.querySelector(`input[value="${pineId}"]`);
+    const checkIcon = checkbox.closest('.pine-script-item').querySelector('.fa-check-circle');
+    
+    if (checkbox.checked) {
+        selectedPineIds.push(pineId);
+        checkIcon.style.display = 'inline';
+    } else {
+        selectedPineIds = selectedPineIds.filter(id => id !== pineId);
+        checkIcon.style.display = 'none';
+    }
+}
+
+function validateUsername() {
     const username = document.getElementById('username').value.trim();
-    const pineIds = document.getElementById('pine_ids').value.trim();
+    if (!username) return;
+
+    showLoading(true);
     
-    if (!username) {
-        showAlert('Username is required', 'danger');
-        return;
-    }
-    
-    if (!pineIds && action !== 'validate') {
-        showAlert('Pine Script IDs are required for this action', 'danger');
-        return;
-    }
-    
-    // Disable the button and show loading
-    const btnId = action + 'Btn';
-    const button = document.getElementById(btnId);
-    const originalText = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
-    
-    // Prepare form data
-    const formData = new FormData();
-    formData.append('action', action);
-    formData.append('username', username);
-    formData.append('pine_ids', pineIds);
-    
-    // Make AJAX request
-    fetch('/manage', {
+    fetch('/api/validate-username', {
         method: 'POST',
         headers: {
+            'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
         },
-        body: formData
+        body: JSON.stringify({ username: username })
     })
-    .then(response => {
-        if (response.ok) {
-            return response.json();
-        }
-        throw new Error('Network response was not ok');
-    })
+    .then(response => response.json())
     .then(data => {
-        // Display the message from server
-        showAlert(data.message, data.type);
+        showLoading(false);
         
-        // Show results section with data
-        showResults(action, username, pineIds, data);
+        if (data.success) {
+            currentUsername = data.data.verifiedUserName;
+            document.getElementById('validated-username').value = currentUsername;
+            document.getElementById('validation-result').textContent = 
+                `Username "${currentUsername}" is valid and ready for access management.`;
+            
+            // Hide username section, show grant section
+            document.getElementById('username-section').style.display = 'none';
+            document.getElementById('grant-section').style.display = 'block';
+        } else {
+            showAlert(data.message, 'danger');
+        }
     })
     .catch(error => {
-        console.error('Error:', error);
-        showAlert('An error occurred while processing the request', 'danger');
-    })
-    .finally(() => {
-        // Re-enable button
-        button.disabled = false;
-        button.innerHTML = originalText;
+        showLoading(false);
+        showAlert('Error validating username: ' + error.message, 'danger');
     });
 }
 
-function showAlert(message, type) {
-    // Remove existing alerts
-    const existingAlerts = document.querySelectorAll('.custom-alert');
-    existingAlerts.forEach(alert => alert.remove());
+function grantAccess() {
+    if (selectedPineIds.length === 0) {
+        showAlert('Please select at least one Pine Script', 'warning');
+        return;
+    }
+
+    showLoading(true);
     
-    // Create new alert
-    const alert = document.createElement('div');
-    alert.className = `alert alert-${type} alert-dismissible fade show custom-alert`;
-    alert.innerHTML = `
+    const duration = document.getElementById('duration').value;
+    
+    fetch('/api/grant-access', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            username: currentUsername,
+            pine_ids: selectedPineIds,
+            duration: duration
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        showLoading(false);
+        
+        if (data.success) {
+            document.getElementById('grant-result').textContent = data.message;
+            document.getElementById('status-username').textContent = currentUsername;
+            document.getElementById('status-details').textContent = 
+                `Access granted to ${selectedPineIds.length} Pine Script(s) for ${duration}`;
+            
+            // Hide grant section, show status section
+            document.getElementById('grant-section').style.display = 'none';
+            document.getElementById('status-section').style.display = 'block';
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        showLoading(false);
+        showAlert('Error granting access: ' + error.message, 'danger');
+    });
+}
+
+function removeAllAccess() {
+    if (!confirm('Are you sure you want to remove all access for this user?')) {
+        return;
+    }
+
+    showLoading(true);
+    
+    fetch('/api/remove-access', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            username: currentUsername,
+            pine_ids: selectedPineIds
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        showLoading(false);
+        
+        if (data.success) {
+            showAlert(data.message, 'success');
+            resetForm();
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        showLoading(false);
+        showAlert('Error removing access: ' + error.message, 'danger');
+    });
+}
+
+function resetForm() {
+    // Reset all variables
+    currentUsername = '';
+    selectedPineIds = [];
+    
+    // Reset form inputs
+    document.getElementById('username').value = '';
+    document.getElementById('validated-username').value = '';
+    
+    // Uncheck all scripts
+    document.querySelectorAll('.pine-script-item input[type="checkbox"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.querySelectorAll('.pine-script-item .fa-check-circle').forEach(icon => {
+        icon.style.display = 'none';
+    });
+    
+    // Show username section, hide others
+    document.getElementById('username-section').style.display = 'block';
+    document.getElementById('grant-section').style.display = 'none';
+    document.getElementById('status-section').style.display = 'none';
+    
+    // Clear alerts
+    document.getElementById('alert-container').innerHTML = '';
+}
+
+function showLoading(show) {
+    document.getElementById('loading').style.display = show ? 'block' : 'none';
+}
+
+function showAlert(message, type) {
+    const alertContainer = document.getElementById('alert-container');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
+    alertContainer.appendChild(alertDiv);
     
-    // Insert at the top of the form
-    const form = document.getElementById('accessForm');
-    form.parentNode.insertBefore(alert, form);
-    
-    // Auto-dismiss after 5 seconds
+    // Auto remove after 5 seconds
     setTimeout(() => {
-        if (alert.parentNode) {
-            alert.remove();
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
         }
     }, 5000);
-}
-
-function showResults(action, username, pineIds, data) {
-    const resultsSection = document.getElementById('resultsSection');
-    const resultsContent = document.getElementById('resultsContent');
-    
-    let content = '';
-    
-    switch(action) {
-        case 'validate':
-            content = `
-                <p><strong>Username Validation:</strong> ${username}</p>
-                ${data.data && data.data.validuser ? 
-                    `<p class="text-success">✓ Valid username: ${data.data.verifiedUserName}</p>` : 
-                    `<p class="text-warning">⚠ Username not found</p>`
-                }
-            `;
-            break;
-        case 'check':
-            content = `
-                <p><strong>Access Check:</strong> ${username}</p>
-                <p><strong>Pine IDs:</strong> ${pineIds}</p>
-                ${data.data ? `<p class="text-info">Checked ${data.data.length} script(s)</p>` : ''}
-            `;
-            break;
-        case 'grant':
-            content = `
-                <p><strong>Access Granted:</strong> ${username}</p>
-                <p><strong>Pine IDs:</strong> ${pineIds}</p>
-                ${data.data ? `
-                    <div class="mt-2">
-                        ${data.data.map(item => `
-                            <div class="d-flex justify-content-between align-items-center border-bottom py-1">
-                                <span class="text-monospace small">${item.pine_id}</span>
-                                <span class="badge bg-${item.status.includes('Success') ? 'success' : 'danger'}">${item.status}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-            `;
-            break;
-        case 'remove':
-            content = `
-                <p><strong>Access Removed:</strong> ${username}</p>
-                <p><strong>Pine IDs:</strong> ${pineIds}</p>
-                ${data.data ? `<p class="text-info">Processed ${data.data.length} script(s)</p>` : ''}
-            `;
-            break;
-    }
-    
-    resultsContent.innerHTML = content;
-    resultsSection.style.display = 'block';
 }
 </script>
 {% endblock %}
