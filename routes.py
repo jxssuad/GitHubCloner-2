@@ -1,6 +1,6 @@
 from flask import render_template, request, jsonify, session, redirect, url_for
-from app import app, db
-from models import AccessLog, PineScript, AccessKey
+from app import app
+from models import AccessLog, PineScript, AccessKey, initialize_default_scripts
 from tradingview import TradingViewAPI
 from datetime import datetime
 import logging
@@ -10,37 +10,6 @@ logger = logging.getLogger(__name__)
 # Initialize TradingView API
 tv_api = TradingViewAPI()
 
-# Default Pine Scripts to add on first run
-DEFAULT_SCRIPTS = [
-    ("Ultraalgo", "PUB;0c59036edcae4c8684c8e17c01eaf137"),
-    ("simplealgo", "PUB;a3690bb3cb3549e7af0378a978f96a43"),
-    ("Million moves.", "PUB;53828990c8014de895162ec99f480803"),
-    ("luxalgo", "PUB;b73e59a4d74e4d3d9a449ad1187b786b"),
-    ("lux Osi Matrix", "PUB;996c8fa1a3d74270b95e24643df04fd5"),
-    ("infnity algo", "PUB;bfb44fdc5d234c4f8aa5fd06f1bf56a6"),
-    ("Diamond algo", "PUB;504fed266bcf48d8ad1d2c7bbe1927ff"),
-    ("Blue signals", "PUB;278e02e275914ad5a5cec9ce0e9d9d22"),
-    ("Goatalgo", "PUB;0a056b6e1feb4183abf6e601d4140189"),
-    ("xpalgo", "PUB;5e901ec6f78043b4bca09e8c2f911e01"),
-    ("NovaAlgo", "PUB;f42a2d8c9ede4bc4b005fb8e56b500cc"),
-]
-
-def initialize_default_scripts():
-    """Add default Pine Scripts if none exist"""
-    if PineScript.query.count() == 0:
-        for name, pine_id in DEFAULT_SCRIPTS:
-            script = PineScript(
-                name=name,
-                pine_id=pine_id,
-                description=f"Default {name} script",
-                is_active=True
-            )
-            db.session.add(script)
-        db.session.commit()
-        logger.info(f"Added {len(DEFAULT_SCRIPTS)} default Pine Scripts")
-
-# Note: Default scripts will be initialized when accessing admin dashboard
-
 # ===== ADMIN ROUTES =====
 
 @app.route('/admin')
@@ -48,15 +17,19 @@ def admin_dashboard():
     """Admin dashboard - key management and monitoring"""
     # Initialize default scripts if needed
     initialize_default_scripts()
-    
-    access_keys = AccessKey.query.order_by(AccessKey.created_at.desc()).all()
-    scripts = PineScript.query.order_by(PineScript.created_at.desc()).all()
-    
+
+    access_keys = AccessKey.get_all()
+    scripts = PineScript.get_all()
+
     # Calculate stats
-    total_keys = AccessKey.query.count()
-    used_keys = AccessKey.query.filter_by(is_used=True).count()
-    total_access = AccessLog.query.filter_by(operation='grant', status='success').count()
-    
+    total_keys = AccessKey.count()
+    used_keys = AccessKey.count_used()
+    total_access = AccessLog.count_successful_grants()
+
+    # Sort by creation date (newest first)
+    access_keys.sort(key=lambda x: x.created_at, reverse=True)
+    scripts.sort(key=lambda x: x.created_at, reverse=True)
+
     return render_template('admin.html',
                          access_keys=access_keys,
                          scripts=scripts,
@@ -69,12 +42,10 @@ def admin_generate_key():
     """Generate a new access key"""
     try:
         key_code = AccessKey.generate_key()
-        new_key = AccessKey(key_code=key_code)
-        db.session.add(new_key)
-        db.session.commit()
-        
-        total_keys = AccessKey.query.count()
-        
+        AccessKey.create(key_code)
+
+        total_keys = AccessKey.count()
+
         return jsonify({
             "success": True,
             "key": key_code,
@@ -92,23 +63,16 @@ def admin_add_script():
         name = data.get('name', '').strip()
         script_id = data.get('script_id', '').strip()
         description = data.get('description', '').strip()
-        
+
         if not name or not script_id:
             return jsonify({"success": False, "error": "Name and Script ID are required"})
-        
+
         # Check if script already exists
-        if PineScript.query.filter_by(pine_id=script_id).first():
+        if PineScript.get(script_id):
             return jsonify({"success": False, "error": "Script ID already exists"})
-        
-        script = PineScript(
-            name=name,
-            pine_id=script_id,
-            description=description,
-            is_active=True
-        )
-        db.session.add(script)
-        db.session.commit()
-        
+
+        PineScript.create(script_id, name, description, True)
+
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error adding script: {e}")
@@ -120,14 +84,10 @@ def admin_remove_script():
     try:
         data = request.get_json()
         script_id = data.get('script_id')
-        
-        script = PineScript.query.filter_by(pine_id=script_id).first()
-        if not script:
+
+        if not PineScript.delete(script_id):
             return jsonify({"success": False, "error": "Script not found"})
-        
-        db.session.delete(script)
-        db.session.commit()
-        
+
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error removing script: {e}")
@@ -137,12 +97,12 @@ def admin_remove_script():
 def admin_key_access(key_code):
     """Get access logs for a specific key"""
     try:
-        access_key = AccessKey.query.filter_by(key_code=key_code).first()
+        access_key = AccessKey.get(key_code)
         if not access_key:
             return jsonify({"success": False, "error": "Key not found"})
-        
-        logs = AccessLog.query.filter_by(key_id=access_key.id).order_by(AccessLog.timestamp.desc()).all()
-        
+
+        logs = AccessLog.get_by_key(key_code)
+
         return jsonify({
             "success": True,
             "access_logs": [
@@ -168,29 +128,27 @@ def admin_remove_user_access():
         data = request.get_json()
         username = data.get('username')
         pine_id = data.get('pine_id')
-        
+
         if not username or not pine_id:
             return jsonify({"success": False, "error": "Username and Pine ID required"})
-        
+
         # Remove access via TradingView API
         result = tv_api.remove_pine_permission(username, pine_id)
-        
+
         # Log the operation
-        script = PineScript.query.filter_by(pine_id=pine_id).first()
+        script = PineScript.get(pine_id)
         script_name = script.name if script else pine_id
-        
-        log = AccessLog(
+
+        AccessLog.create(
             username=username,
             pine_id=pine_id,
             pine_script_name=script_name,
             operation="remove",
             status="success" if result.get('success', False) else "failure",
             details=result.get('message', 'Admin removal'),
-            key_id=None  # Admin action, not tied to a key
+            key_code=None  # Admin action, not tied to a key
         )
-        db.session.add(log)
-        db.session.commit()
-        
+
         return jsonify({
             "success": result.get('success', False),
             "message": result.get('message', 'Access removal completed')
@@ -204,7 +162,7 @@ def admin_remove_user_access():
 @app.route('/access')
 def access_page():
     """User access page - key entry and script selection"""
-    scripts = PineScript.query.filter_by(is_active=True).all()
+    scripts = PineScript.get_active()
     return render_template('access.html', scripts=scripts)
 
 @app.route('/access/validate-key', methods=['POST'])
@@ -213,23 +171,23 @@ def access_validate_key():
     try:
         data = request.get_json()
         key_code = data.get('key', '').strip().upper()
-        
+
         if not key_code:
             return jsonify({"success": False, "error": "Access key is required"})
-        
+
         # Find the key
-        access_key = AccessKey.query.filter_by(key_code=key_code).first()
-        
+        access_key = AccessKey.get(key_code)
+
         if not access_key:
             return jsonify({"success": False, "error": "Invalid access key"})
-        
+
         if access_key.is_used:
             return jsonify({"success": False, "error": "This access key has already been used"})
-        
+
         # Mark key as validated in session (but not used yet)
-        session['access_key_id'] = access_key.id
+        session['access_key_code'] = access_key.key_code
         session['access_key_used'] = True
-        
+
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error validating key: {e}")
@@ -241,23 +199,23 @@ def access_validate_username():
     try:
         if not session.get('access_key_used'):
             return jsonify({"success": False, "error": "Please validate your access key first"})
-        
+
         data = request.get_json()
         username = data.get('username', '').strip()
-        
+
         if not username:
             return jsonify({"success": False, "error": "Username is required"})
-        
+
         # Validate username with TradingView
         result = tv_api.validate_username(username)
-        
+
         if result.get('validuser', False):
             session['username'] = username
             session['username_valid'] = True
             return jsonify({"success": True, "verified_name": result.get('verifiedUserName', username)})
         else:
             return jsonify({"success": False, "error": "Invalid TradingView username"})
-            
+
     except Exception as e:
         logger.error(f"Error validating username: {e}")
         return jsonify({"success": False, "error": "Error validating username. Please try again."})
@@ -268,71 +226,67 @@ def access_grant_access():
     try:
         if not session.get('access_key_used') or not session.get('username_valid'):
             return jsonify({"success": False, "error": "Please validate your key and username first"})
-        
+
         data = request.get_json()
         selected_scripts = data.get('scripts', [])
         username = session.get('username')
-        access_key_id = session.get('access_key_id')
-        
+        access_key_code = session.get('access_key_code')
+
         if not selected_scripts:
             return jsonify({"success": False, "error": "Please select at least one script"})
-        
+
         # Mark the access key as used
-        access_key = AccessKey.query.get(access_key_id)
+        access_key = AccessKey.get(access_key_code)
         if access_key and not access_key.is_used:
             access_key.is_used = True
             access_key.used_at = datetime.utcnow()
             access_key.used_by_username = username
-            db.session.commit()
-        
+
         results = []
         errors = []
-        
+
         for script_id in selected_scripts:
-            script = PineScript.query.filter_by(pine_id=script_id).first()
+            script = PineScript.get(script_id)
             script_name = script.name if script else script_id
-            
+
             try:
                 # Grant access via TradingView API
                 result = tv_api.add_pine_permission(username, script_id)
-                
+
                 success = result.get('success', False)
                 status = "success" if success else "failure"
-                
+
                 # Log the operation
-                log = AccessLog(
+                AccessLog.create(
                     username=username,
                     pine_id=script_id,
                     pine_script_name=script_name,
                     operation="grant",
                     status=status,
                     details=result.get('message', ''),
-                    key_id=access_key_id
+                    key_code=access_key_code
                 )
-                db.session.add(log)
-                
+
                 if success:
                     results.append({"script_name": script_name, "success": True})
                 else:
                     errors.append({"script_name": script_name, "error": result.get('message', 'Unknown error')})
-                    
+
             except Exception as e:
                 logger.error(f"Error granting access to {script_name}: {e}")
                 errors.append({"script_name": script_name, "error": str(e)})
-        
-        db.session.commit()
-        
+
         # Clear session after use
-        session.pop('access_key_id', None)
+        session.pop('access_key_code', None)
         session.pop('access_key_used', None)
         session.pop('username_valid', None)
-        
+
         return jsonify({
             "success": len(results) > 0,
             "results": results,
             "errors": errors
         })
-        
+
     except Exception as e:
         logger.error(f"Error granting access: {e}")
         return jsonify({"success": False, "error": str(e)})
@@ -356,5 +310,4 @@ def not_found(error):
 
 @app.errorhandler(500)
 def internal_error(error):
-    db.session.rollback()
     return "<h1>500 - Internal Server Error</h1>", 500

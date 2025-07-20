@@ -2,7 +2,7 @@
 import os
 
 class Config:
-    """Configuration class for TradingView Access Management - Replit Optimized"""
+    """Configuration class for TradingView Access Management - No Database Version"""
     
     # TradingView credentials
     TRADINGVIEW_USERNAME = os.getenv("TRADINGVIEW_USERNAME", "")
