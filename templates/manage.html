@@ -38,7 +38,12 @@
                             
                             <!-- Pine Scripts Selection -->
                             <div class="mb-3">
-                                <label class="form-label">Select Pine Scripts:</label>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label mb-0">Select Pine Scripts:</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllScripts()">
+                                        <i class="fas fa-check-double me-1"></i>Select All
+                                    </button>
+                                </div>
                                 <div class="row" id="pine-scripts-list">
                                     <!-- Scripts will be loaded here -->
                                 </div>
@@ -275,14 +280,29 @@ function grantAccess() {
         showLoading(false);
         
         if (data.success) {
-            document.getElementById('grant-result').textContent = data.message;
-            document.getElementById('status-username').textContent = currentUsername;
-            document.getElementById('status-details').textContent = 
-                `Access granted to ${selectedPineIds.length} Pine Script(s) for ${duration}`;
+            const grantResultEl = document.getElementById('grant-result');
+            const statusUsernameEl = document.getElementById('status-username');
+            const statusDetailsEl = document.getElementById('status-details');
+            const grantSectionEl = document.getElementById('grant-section');
+            const statusSectionEl = document.getElementById('status-section');
+            
+            if (grantResultEl) {
+                grantResultEl.textContent = data.message;
+            }
+            if (statusUsernameEl) {
+                statusUsernameEl.textContent = currentUsername;
+            }
+            if (statusDetailsEl) {
+                statusDetailsEl.textContent = `Access granted to ${selectedPineIds.length} Pine Script(s) for ${duration}`;
+            }
             
             // Hide grant section, show status section
-            document.getElementById('grant-section').style.display = 'none';
-            document.getElementById('status-section').style.display = 'block';
+            if (grantSectionEl) {
+                grantSectionEl.style.display = 'none';
+            }
+            if (statusSectionEl) {
+                statusSectionEl.style.display = 'block';
+            }
         } else {
             showAlert(data.message, 'danger');
         }
@@ -328,6 +348,49 @@ function removeAllAccess() {
     });
 }
 
+function selectAllScripts() {
+    // Select all Pine Scripts
+    selectedPineIds = [];
+    document.querySelectorAll('.pine-script-item input[type="checkbox"]').forEach(checkbox => {
+        checkbox.checked = true;
+        selectedPineIds.push(checkbox.value);
+        
+        // Show tick mark
+        const checkIcon = checkbox.closest('.pine-script-item').querySelector('.fa-check-circle');
+        if (checkIcon) {
+            checkIcon.style.display = 'inline';
+        }
+    });
+    
+    // Update button text
+    const selectAllBtn = document.querySelector('button[onclick="selectAllScripts()"]');
+    if (selectAllBtn) {
+        selectAllBtn.innerHTML = '<i class="fas fa-times me-1"></i>Deselect All';
+        selectAllBtn.setAttribute('onclick', 'deselectAllScripts()');
+    }
+}
+
+function deselectAllScripts() {
+    // Deselect all Pine Scripts
+    selectedPineIds = [];
+    document.querySelectorAll('.pine-script-item input[type="checkbox"]').forEach(checkbox => {
+        checkbox.checked = false;
+        
+        // Hide tick mark
+        const checkIcon = checkbox.closest('.pine-script-item').querySelector('.fa-check-circle');
+        if (checkIcon) {
+            checkIcon.style.display = 'none';
+        }
+    });
+    
+    // Update button text
+    const deselectAllBtn = document.querySelector('button[onclick="deselectAllScripts()"]');
+    if (deselectAllBtn) {
+        deselectAllBtn.innerHTML = '<i class="fas fa-check-double me-1"></i>Select All';
+        deselectAllBtn.setAttribute('onclick', 'selectAllScripts()');
+    }
+}
+
 function resetForm() {
     // Reset all variables
     currentUsername = '';
@@ -335,7 +398,10 @@ function resetForm() {
     
     // Reset form inputs
     document.getElementById('username').value = '';
-    document.getElementById('validated-username').value = '';
+    const validatedUsernameEl = document.getElementById('validated-username');
+    if (validatedUsernameEl) {
+        validatedUsernameEl.value = '';
+    }
     
     // Uncheck all scripts
     document.querySelectorAll('.pine-script-item input[type="checkbox"]').forEach(checkbox => {
@@ -344,6 +410,13 @@ function resetForm() {
     document.querySelectorAll('.pine-script-item .fa-check-circle').forEach(icon => {
         icon.style.display = 'none';
     });
+    
+    // Reset select all button
+    const selectBtn = document.querySelector('button[onclick="selectAllScripts()"], button[onclick="deselectAllScripts()"]');
+    if (selectBtn) {
+        selectBtn.innerHTML = '<i class="fas fa-check-double me-1"></i>Select All';
+        selectBtn.setAttribute('onclick', 'selectAllScripts()');
+    }
     
     // Show username section, hide others
     document.getElementById('username-section').style.display = 'block';
