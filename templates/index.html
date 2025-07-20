@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - TradingView Access Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- System Status -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-server me-2"></i>
+                <h5 class="mb-0">System Status</h5>
+            </div>
+            <div class="card-body">
+                {% if config_valid %}
+                    <div class="alert alert-success mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>System Ready:</strong> TradingView credentials configured and ready for access management.
+                    </div>
+                {% else %}
+                    <div class="alert alert-danger mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Configuration Required:</strong> Please set TRADINGVIEW_USERNAME and TRADINGVIEW_PASSWORD environment variables.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Quick Actions -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-bolt me-2"></i>
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('main.manage') }}" class="btn btn-primary">
+                        <i class="fas fa-users-cog me-2"></i>
+                        Manage User Access
+                    </a>
+                    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addScriptModal">
+                        <i class="fas fa-plus me-2"></i>
+                        Add Pine Script
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pine Scripts -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div>
+                    <i class="fas fa-code me-2"></i>
+                    <h5 class="mb-0 d-inline">Configured Scripts</h5>
+                </div>
+                <span class="badge bg-secondary">{{ pine_scripts|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if pine_scripts %}
+                    <div class="list-group list-group-flush">
+                        {% for script in pine_scripts %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ script.name }}</h6>
+                                    <small class="text-muted">{{ script.pine_id }}</small>
+                                    {% if script.description %}
+                                        <p class="mb-1 small">{{ script.description }}</p>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('main.toggle_pine_script', script_id=script.id) }}" 
+                                       class="btn btn-sm btn-outline-{{ 'success' if script.is_active else 'secondary' }}">
+                                        <i class="fas fa-{{ 'toggle-on' if script.is_active else 'toggle-off' }}"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-code fa-3x mb-3"></i>
+                        <p>No Pine Scripts configured yet.</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addScriptModal">
+                            <i class="fas fa-plus me-2"></i>Add Your First Script
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-history me-2"></i>
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_logs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Username</th>
+                                    <th>Operation</th>
+                                    <th>Status</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in recent_logs %}
+                                    <tr>
+                                        <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            <i class="fas fa-user me-1"></i>
+                                            {{ log.username }}
+                                        </td>
+                                        <td>
+                                            {% set operation_icons = {
+                                                'validate': 'fa-check',
+                                                'grant': 'fa-plus-circle',
+                                                'remove': 'fa-minus-circle',
+                                                'check': 'fa-search'
+                                            } %}
+                                            <i class="fas {{ operation_icons.get(log.operation, 'fa-cog') }} me-1"></i>
+                                            {{ log.operation.title() }}
+                                        </td>
+                                        <td>
+                                            {% if log.status == 'success' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check me-1"></i>Success
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times me-1"></i>Failed
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ log.details or '-' }}</small>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-history fa-3x mb-3"></i>
+                        <p>No recent activity to display.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Script Modal -->
+<div class="modal fade" id="addScriptModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>Add Pine Script
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.add_pine_script') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="pine_id" class="form-label">Pine Script ID</label>
+                        <input type="text" class="form-control" id="pine_id" name="pine_id" 
+                               placeholder="PUB;xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" required>
+                        <div class="form-text">
+                            Find this ID in browser developer tools when viewing your script.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Script Name</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               placeholder="My Trading Strategy" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"
+                                  placeholder="Brief description of the script..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Add Script
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

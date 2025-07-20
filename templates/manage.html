@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Access - TradingView Access Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-users-cog me-2"></i>
+                    User Access Management
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <!-- Username Input -->
+                    <div class="mb-4">
+                        <label for="username" class="form-label">
+                            <i class="fas fa-user me-2"></i>TradingView Username
+                        </label>
+                        <input type="text" class="form-control" id="username" name="username" 
+                               placeholder="Enter TradingView username" required>
+                        <div class="form-text">
+                            Enter the exact TradingView username (case-sensitive).
+                        </div>
+                    </div>
+
+                    <!-- Pine Script IDs -->
+                    <div class="mb-4">
+                        <label for="pine_ids" class="form-label">
+                            <i class="fas fa-code me-2"></i>Pine Script IDs
+                        </label>
+                        <textarea class="form-control" id="pine_ids" name="pine_ids" rows="3" 
+                                  placeholder="PUB;xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,PUB;yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy">{{ default_pine_ids }}</textarea>
+                        <div class="form-text">
+                            Enter Pine Script IDs separated by commas. Find these in browser developer tools.
+                        </div>
+                        
+                        {% if pine_scripts %}
+                            <div class="mt-2">
+                                <small class="text-muted">Configured Scripts:</small>
+                                <div class="mt-1">
+                                    {% for script in pine_scripts %}
+                                        <button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1" 
+                                                onclick="addPineId('{{ script.pine_id }}')">
+                                            {{ script.name }}
+                                        </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <button type="submit" name="action" value="validate" 
+                                    class="btn btn-info w-100">
+                                <i class="fas fa-check me-2"></i>Validate User
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <button type="submit" name="action" value="check" 
+                                    class="btn btn-secondary w-100">
+                                <i class="fas fa-search me-2"></i>Check Access
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <button type="submit" name="action" value="grant" 
+                                    class="btn btn-success w-100">
+                                <i class="fas fa-plus-circle me-2"></i>Grant Access
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <button type="submit" name="action" value="remove" 
+                                    class="btn btn-danger w-100">
+                                <i class="fas fa-minus-circle me-2"></i>Remove Access
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-question-circle me-2"></i>
+                    Instructions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-user me-2"></i>Username Management</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i><strong>Validate User:</strong> Verify username exists</li>
+                            <li><i class="fas fa-search text-secondary me-2"></i><strong>Check Access:</strong> View current permissions</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-cog me-2"></i>Access Control</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-plus-circle text-success me-2"></i><strong>Grant Access:</strong> Add user permissions</li>
+                            <li><i class="fas fa-minus-circle text-danger me-2"></i><strong>Remove Access:</strong> Revoke user permissions</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="mt-3 p-3 bg-dark rounded">
+                    <h6><i class="fas fa-code me-2"></i>Finding Pine Script IDs</h6>
+                    <p class="mb-2 small">To find Pine Script IDs:</p>
+                    <ol class="small mb-0">
+                        <li>Open your TradingView script page</li>
+                        <li>Open browser Developer Tools (F12)</li>
+                        <li>Look for requests containing "PUB;" followed by a 32-character ID</li>
+                        <li>Copy the full ID including "PUB;" prefix</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function addPineId(pineId) {
+    const textarea = document.getElementById('pine_ids');
+    const currentValue = textarea.value.trim();
+    
+    if (currentValue === '') {
+        textarea.value = pineId;
+    } else {
+        // Check if ID already exists
+        if (!currentValue.includes(pineId)) {
+            textarea.value = currentValue + ',' + pineId;
+        }
+    }
+    
+    // Focus back to textarea
+    textarea.focus();
+}
+</script>
+{% endblock %}
