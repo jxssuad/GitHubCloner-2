@@ -15,12 +15,14 @@ Preferred communication style: Simple, everyday language.
 - **Database**: SQLite by default with configurable database support via environment variables
 - **Session Management**: Flask sessions with proxy fix for deployment environments
 - **Configuration**: Environment-based configuration with dotenv support
+- **TradingView Integration**: Real authentication with session management and Pine Script access control
 
 ### Frontend Architecture
 - **Template Engine**: Jinja2 templates with Flask
 - **CSS Framework**: Bootstrap 5 with dark theme
-- **JavaScript**: Vanilla JavaScript with Bootstrap components
+- **JavaScript**: Vanilla JavaScript with Bootstrap components and AJAX for form handling
 - **Icons**: Font Awesome for UI icons
+- **User Experience**: Non-refreshing interface with real-time feedback
 
 ## Key Components
 

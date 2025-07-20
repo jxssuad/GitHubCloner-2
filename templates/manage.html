@@ -13,7 +13,7 @@
                 </h4>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form id="accessForm">
                     <!-- Username Input -->
                     <div class="mb-4">
                         <label for="username" class="form-label">
@@ -55,31 +55,45 @@
                     <!-- Action Buttons -->
                     <div class="row">
                         <div class="col-md-3 mb-2">
-                            <button type="submit" name="action" value="validate" 
-                                    class="btn btn-info w-100">
+                            <button type="button" onclick="performAction('validate')" 
+                                    class="btn btn-info w-100" id="validateBtn">
                                 <i class="fas fa-check me-2"></i>Validate User
                             </button>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <button type="submit" name="action" value="check" 
-                                    class="btn btn-secondary w-100">
+                            <button type="button" onclick="performAction('check')" 
+                                    class="btn btn-secondary w-100" id="checkBtn">
                                 <i class="fas fa-search me-2"></i>Check Access
                             </button>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <button type="submit" name="action" value="grant" 
-                                    class="btn btn-success w-100">
+                            <button type="button" onclick="performAction('grant')" 
+                                    class="btn btn-success w-100" id="grantBtn">
                                 <i class="fas fa-plus-circle me-2"></i>Grant Access
                             </button>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <button type="submit" name="action" value="remove" 
-                                    class="btn btn-danger w-100">
+                            <button type="button" onclick="performAction('remove')" 
+                                    class="btn btn-danger w-100" id="removeBtn">
                                 <i class="fas fa-minus-circle me-2"></i>Remove Access
                             </button>
                         </div>
                     </div>
                 </form>
+
+                <!-- Results Section -->
+                <div id="resultsSection" class="mt-4" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-list-alt me-2"></i>Results
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="resultsContent"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -142,6 +156,129 @@ function addPineId(pineId) {
     
     // Focus back to textarea
     textarea.focus();
+}
+
+function performAction(action) {
+    const username = document.getElementById('username').value.trim();
+    const pineIds = document.getElementById('pine_ids').value.trim();
+    
+    if (!username) {
+        showAlert('Username is required', 'danger');
+        return;
+    }
+    
+    if (!pineIds && action !== 'validate') {
+        showAlert('Pine Script IDs are required for this action', 'danger');
+        return;
+    }
+    
+    // Disable the button and show loading
+    const btnId = action + 'Btn';
+    const button = document.getElementById(btnId);
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('action', action);
+    formData.append('username', username);
+    formData.append('pine_ids', pineIds);
+    
+    // Make AJAX request
+    fetch('/manage', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.redirected) {
+            // Handle redirect (likely with flash messages)
+            window.location.href = response.url;
+        } else {
+            return response.text();
+        }
+    })
+    .then(data => {
+        if (data) {
+            // Parse the response to extract flash messages
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(data, 'text/html');
+            const alerts = doc.querySelectorAll('.alert');
+            
+            // Display flash messages
+            alerts.forEach(alert => {
+                const message = alert.textContent.trim();
+                const type = alert.classList.contains('alert-success') ? 'success' :
+                           alert.classList.contains('alert-danger') ? 'danger' :
+                           alert.classList.contains('alert-warning') ? 'warning' : 'info';
+                showAlert(message, type);
+            });
+            
+            showResults(action, username, pineIds);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('An error occurred while processing the request', 'danger');
+    })
+    .finally(() => {
+        // Re-enable button
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function showAlert(message, type) {
+    // Remove existing alerts
+    const existingAlerts = document.querySelectorAll('.custom-alert');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    // Create new alert
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show custom-alert`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insert at the top of the form
+    const form = document.getElementById('accessForm');
+    form.parentNode.insertBefore(alert, form);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+function showResults(action, username, pineIds) {
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsContent = document.getElementById('resultsContent');
+    
+    let content = '';
+    
+    switch(action) {
+        case 'validate':
+            content = `<p><strong>Username Validation:</strong> ${username}</p>`;
+            break;
+        case 'check':
+            content = `<p><strong>Access Check:</strong> ${username}</p>
+                      <p><strong>Pine IDs:</strong> ${pineIds}</p>`;
+            break;
+        case 'grant':
+            content = `<p><strong>Access Granted:</strong> ${username}</p>
+                      <p><strong>Pine IDs:</strong> ${pineIds}</p>`;
+            break;
+        case 'remove':
+            content = `<p><strong>Access Removed:</strong> ${username}</p>
+                      <p><strong>Pine IDs:</strong> ${pineIds}</p>`;
+            break;
+    }
+    
+    resultsContent.innerHTML = content;
+    resultsSection.style.display = 'block';
 }
 </script>
 {% endblock %}
