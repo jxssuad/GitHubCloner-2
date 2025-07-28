@@ -527,7 +527,7 @@ class TradingViewAPI:
                     logger.error(f"Error parsing users data for {pine_id}: {e}")
                     return []
             else:
-                logger.error(f"Failed to get users for {pine_id}: HTTP {response.status_code}")
+                logger.info(f"No users found with access to {pine_id}")
                 return []
 
         except Exception as e:
