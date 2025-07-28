@@ -54,28 +54,36 @@
 
                         <div class="mb-3">
                             <label class="form-label">Select Pine Scripts</label>
-                            <div class="row">
+                            <div class="script-selection-area">
                                 {% for script in scripts %}
-                                <div class="col-md-6 mb-2">
+                                <div class="script-checkbox-container">
                                     <div class="form-check">
                                         <input class="form-check-input script-checkbox" type="checkbox" value="{{ script.pine_id }}" id="script{{ loop.index }}">
                                         <label class="form-check-label" for="script{{ loop.index }}">
-                                            <strong class="text-primary">{{ script.name }}</strong>
-                                            <small class="text-muted d-block">{{ script.description }}</small>
+                                            <strong>{{ script.name }}</strong>
+                                            {% if script.description %}
+                                            <small class="d-block">{{ script.description }}</small>
+                                            {% endif %}
+                                            <div class="btn-group btn-group-sm mt-2" role="group">
+                                                <button type="button" class="btn btn-outline-info" onclick="getScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
+                                                    <i class="fas fa-users me-1"></i>View Users
+                                                </button>
+                                                <button type="button" class="btn btn-outline-success" onclick="exportScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
+                                                    <i class="fas fa-download me-1"></i>Export
+                                                </button>
+                                            </div>
                                         </label>
-                                        <div class="btn-group btn-group-sm ms-2" role="group">
-                                            <button type="button" class="btn btn-outline-info" onclick="getScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
-                                                <i class="fas fa-users me-1"></i>View Users
-                                            </button>
-                                            <button type="button" class="btn btn-outline-success" onclick="exportScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
-                                                <i class="fas fa-download me-1"></i>Export
-                                            </button>
-                                        </div>
                                     </div>
                                 </div>
                                 {% endfor %}
+                                {% if not scripts %}
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-code fa-2x mb-2"></i>
+                                    <p class="mb-0">No scripts available. Add some scripts to get started.</p>
+                                </div>
+                                {% endif %}
                             </div>
-                            <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="toggleSelectAll()">
+                            <button type="button" class="btn btn-sm btn-secondary mt-3" onclick="toggleSelectAll()">
                                 <i class="fas fa-check-square me-1"></i>Select All
                             </button>
                         </div>
