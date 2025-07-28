@@ -62,17 +62,17 @@
                                         <label class="form-check-label" for="script{{ loop.index }}">
                                             <strong>{{ script.name }}</strong>
                                             {% if script.description %}
-                                            <small class="d-block">{{ script.description }}</small>
+                                            <small>{{ script.description }}</small>
                                             {% endif %}
-                                            <div class="btn-group btn-group-sm mt-2" role="group">
-                                                <button type="button" class="btn btn-outline-info" onclick="getScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
-                                                    <i class="fas fa-users me-1"></i>View Users
-                                                </button>
-                                                <button type="button" class="btn btn-outline-success" onclick="exportScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
-                                                    <i class="fas fa-download me-1"></i>Export
-                                                </button>
-                                            </div>
                                         </label>
+                                    </div>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-info" onclick="getScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
+                                            <i class="fas fa-users me-1"></i>View Users
+                                        </button>
+                                        <button type="button" class="btn btn-outline-success" onclick="exportScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
+                                            <i class="fas fa-download me-1"></i>Export
+                                        </button>
                                     </div>
                                 </div>
                                 {% endfor %}
