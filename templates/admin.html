@@ -76,6 +76,26 @@
                             </button>
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label">Access Duration</label>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="customDurationSwitch" onchange="toggleCustomDuration()">
+                                <label class="form-check-label" for="customDurationSwitch">
+                                    Enable Custom Duration (Default: Lifetime Access)
+                                </label>
+                            </div>
+                            <div id="durationSelector" style="display: none;">
+                                <select class="form-select" id="accessDuration">
+                                    <option value="1L">Lifetime Access</option>
+                                    <option value="1D">1 Day</option>
+                                    <option value="7D">7 Days</option>
+                                    <option value="30D">30 Days</option>
+                                    <option value="90D">90 Days</option>
+                                    <option value="1Y">1 Year</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <button type="submit" class="btn btn-success">
                             <i class="fas fa-plus me-2"></i>Grant Access
                         </button>
@@ -211,6 +231,14 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <div class="mb-3">
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removeSelectedUsers()" id="removeSelectedBtn" style="display: none;">
+                        <i class="fas fa-trash me-1"></i>Remove Selected Users
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary ms-2" onclick="toggleSelectAllUsers()" id="selectAllUsersBtn" style="display: none;">
+                        <i class="fas fa-check-square me-1"></i>Select All
+                    </button>
+                </div>
                 <div id="scriptUsersContent">
                     <div class="text-center">
                         <div class="spinner-border" role="status">
@@ -227,6 +255,8 @@
 <script>
 let usernameValid = false;
 let allSelected = false;
+let currentScriptId = '';
+let allUsersSelected = false;
 
 // Username validation
 document.getElementById('validateBtn').addEventListener('click', function() {
@@ -273,6 +303,8 @@ document.getElementById('accessForm').addEventListener('submit', function(e) {
     
     const username = document.getElementById('username').value.trim();
     const selectedScripts = Array.from(document.querySelectorAll('.script-checkbox:checked')).map(cb => cb.value);
+    const customDurationEnabled = document.getElementById('customDurationSwitch').checked;
+    const duration = customDurationEnabled ? document.getElementById('accessDuration').value : '1L';
     
     if (selectedScripts.length === 0) {
         alert('Please select at least one script');
@@ -287,7 +319,7 @@ document.getElementById('accessForm').addEventListener('submit', function(e) {
     fetch('/api/grant-access', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username: username, scripts: selectedScripts})
+        body: JSON.stringify({username: username, scripts: selectedScripts, duration: duration})
     })
     .then(response => response.json())
     .then(data => {
@@ -341,7 +373,20 @@ function toggleSelectAll() {
         : '<i class="fas fa-check-square me-1"></i>Select All';
 }
 
+function toggleCustomDuration() {
+    const durationSelector = document.getElementById('durationSelector');
+    const isEnabled = document.getElementById('customDurationSwitch').checked;
+    
+    if (isEnabled) {
+        durationSelector.style.display = 'block';
+    } else {
+        durationSelector.style.display = 'none';
+        document.getElementById('accessDuration').value = '1L';
+    }
+}
+
 function getScriptUsers(scriptId, scriptName) {
+    currentScriptId = scriptId;
     document.getElementById('scriptNameTitle').textContent = scriptName;
     
     const modal = new bootstrap.Modal(document.getElementById('scriptUsersModal'));
@@ -353,15 +398,21 @@ function getScriptUsers(scriptId, scriptName) {
         const contentDiv = document.getElementById('scriptUsersContent');
         
         if (data.success && data.users.length > 0) {
-            let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Username</th><th>Access Type</th><th>Expiration</th><th>Created</th></tr></thead><tbody>';
+            let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th><input type="checkbox" id="selectAllUsers" onchange="toggleSelectAllUsers()"></th><th>Username</th><th>Access Type</th><th>Expiration</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
             
-            data.users.forEach(user => {
+            data.users.forEach((user, index) => {
                 html += `
                     <tr>
+                        <td><input type="checkbox" class="user-checkbox" value="${user.username}" id="user${index}"></td>
                         <td><strong>${user.username}</strong></td>
                         <td><span class="badge bg-${user.has_lifetime_access ? 'success' : 'warning'}">${user.has_lifetime_access ? 'Lifetime' : 'Temporary'}</span></td>
                         <td>${user.expiration ? new Date(user.expiration).toLocaleDateString() : 'Never'}</td>
                         <td>${user.created ? new Date(user.created).toLocaleDateString() : '-'}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSingleUser('${user.username}')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
@@ -369,12 +420,99 @@ function getScriptUsers(scriptId, scriptName) {
             html += '</tbody></table></div>';
             html += `<p class="text-muted mt-3">Total users: ${data.users.length}</p>`;
             contentDiv.innerHTML = html;
+            
+            // Show control buttons
+            document.getElementById('removeSelectedBtn').style.display = 'inline-block';
+            document.getElementById('selectAllUsersBtn').style.display = 'inline-block';
         } else {
             contentDiv.innerHTML = '<div class="alert alert-info">No users found with access to this script.</div>';
+            document.getElementById('removeSelectedBtn').style.display = 'none';
+            document.getElementById('selectAllUsersBtn').style.display = 'none';
         }
     })
     .catch(error => {
         document.getElementById('scriptUsersContent').innerHTML = '<div class="alert alert-danger">Error loading users.</div>';
+        document.getElementById('removeSelectedBtn').style.display = 'none';
+        document.getElementById('selectAllUsersBtn').style.display = 'none';
+    });
+}
+
+function toggleSelectAllUsers() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllUsers');
+    allUsersSelected = !allUsersSelected;
+    
+    checkboxes.forEach(cb => {
+        cb.checked = allUsersSelected;
+    });
+    
+    selectAllCheckbox.checked = allUsersSelected;
+    
+    const btn = document.getElementById('selectAllUsersBtn');
+    btn.innerHTML = allUsersSelected 
+        ? '<i class="fas fa-square me-1"></i>Deselect All'
+        : '<i class="fas fa-check-square me-1"></i>Select All';
+}
+
+function removeSelectedUsers() {
+    const selectedUsers = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
+    
+    if (selectedUsers.length === 0) {
+        alert('Please select at least one user to remove');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to remove access for ${selectedUsers.length} user(s)?`)) {
+        return;
+    }
+    
+    const btn = document.getElementById('removeSelectedBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Removing...';
+    btn.disabled = true;
+    
+    fetch('/api/bulk-remove-access', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            usernames: selectedUsers,
+            script_id: currentScriptId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Successfully removed access for ${data.removed_count} user(s)`);
+            // Refresh the user list
+            const scriptName = document.getElementById('scriptNameTitle').textContent;
+            getScriptUsers(currentScriptId, scriptName);
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function removeSingleUser(username) {
+    if (!confirm(`Remove access for ${username}?`)) return;
+    
+    fetch('/api/remove-access', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: username, script_id: currentScriptId})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Refresh the user list
+            const scriptName = document.getElementById('scriptNameTitle').textContent;
+            getScriptUsers(currentScriptId, scriptName);
+        } else {
+            alert(data.message);
+        }
     });
 }
 

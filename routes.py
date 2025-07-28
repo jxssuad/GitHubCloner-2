@@ -64,6 +64,7 @@ def grant_access():
         data = request.get_json()
         username = data.get('username', '').strip()
         selected_scripts = data.get('scripts', [])
+        duration = data.get('duration', '1L')  # Default to lifetime
 
         if not username:
             return jsonify({"success": False, "error": "Username is required"})
@@ -79,8 +80,17 @@ def grant_access():
             script_name = script.name if script else script_id
 
             try:
-                # Grant access via TradingView API
-                result = tv_api.add_pine_permission(username, script_id)
+                # Grant access via TradingView API with duration
+                if duration == '1L':
+                    result = tv_api.add_pine_permission(username, script_id)
+                else:
+                    result = tv_api.grant_access(username, [script_id], duration)
+                    if isinstance(result, list) and len(result) > 0:
+                        result = result[0]
+                        result = {
+                            'success': result.get('status') == 'Success',
+                            'message': result.get('status', 'Unknown')
+                        }
 
                 success = result.get('success', False)
                 status = "success" if success else "failure"
@@ -92,11 +102,11 @@ def grant_access():
                     pine_script_name=script_name,
                     operation="grant",
                     status=status,
-                    details=result.get('message', '')
+                    details=f"Duration: {duration}, {result.get('message', '')}"
                 )
 
                 if success:
-                    results.append({"script_name": script_name, "success": True})
+                    results.append({"script_name": script_name, "success": True, "duration": duration})
                 else:
                     errors.append({"script_name": script_name, "error": result.get('message', 'Unknown error')})
 
@@ -205,6 +215,58 @@ def remove_script():
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error removing script: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/bulk-remove-access', methods=['POST'])
+def bulk_remove_access():
+    """Remove access for multiple users from a Pine Script"""
+    try:
+        data = request.get_json()
+        usernames = data.get('usernames', [])
+        script_id = data.get('script_id', '').strip()
+
+        if not usernames or not script_id:
+            return jsonify({"success": False, "error": "Usernames and Script ID required"})
+
+        script = PineScript.get(script_id)
+        script_name = script.name if script else script_id
+
+        removed_count = 0
+        errors = []
+
+        for username in usernames:
+            try:
+                # Remove access via TradingView API
+                result = tv_api.remove_pine_permission(username, script_id)
+
+                # Log the operation
+                AccessLog.create(
+                    username=username,
+                    pine_id=script_id,
+                    pine_script_name=script_name,
+                    operation="remove",
+                    status="success" if result.get('success', False) else "failure",
+                    details=f"Bulk removal - {result.get('message', '')}"
+                )
+
+                if result.get('success', False):
+                    removed_count += 1
+                else:
+                    errors.append(f"{username}: {result.get('message', 'Unknown error')}")
+
+            except Exception as e:
+                logger.error(f"Error removing access for {username}: {e}")
+                errors.append(f"{username}: {str(e)}")
+
+        return jsonify({
+            "success": removed_count > 0,
+            "removed_count": removed_count,
+            "total_requested": len(usernames),
+            "errors": errors
+        })
+
+    except Exception as e:
+        logger.error(f"Error bulk removing access: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 # ===== REDIRECT ROUTES =====
