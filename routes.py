@@ -269,6 +269,68 @@ def bulk_remove_access():
         logger.error(f"Error bulk removing access: {e}")
         return jsonify({"success": False, "error": str(e)})
 
+@app.route('/api/export-script-users/<script_id>')
+def export_script_users(script_id):
+    """Export all usernames that have access to a specific Pine Script as text file"""
+    try:
+        # Get users from TradingView API
+        users = tv_api.get_script_users(script_id)
+        
+        script = PineScript.get(script_id)
+        script_name = script.name if script else script_id
+
+        if not users:
+            # Return empty file if no users
+            from flask import Response
+            return Response(
+                "No users found with access to this script.\n",
+                mimetype='text/plain',
+                headers={"Content-disposition": f"attachment; filename={script_name.replace(' ', '_')}_users.txt"}
+            )
+
+        # Create text content with usernames
+        text_content = f"Users with access to: {script_name}\n"
+        text_content += f"Script ID: {script_id}\n"
+        text_content += f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        text_content += "=" * 50 + "\n\n"
+        
+        for i, user in enumerate(users, 1):
+            username = user.get('username', 'Unknown')
+            access_type = 'Lifetime' if user.get('has_lifetime_access', False) else 'Temporary'
+            expiration = user.get('expiration')
+            created = user.get('created')
+            
+            text_content += f"{i}. {username}\n"
+            text_content += f"   Access Type: {access_type}\n"
+            
+            if expiration:
+                text_content += f"   Expires: {expiration}\n"
+            else:
+                text_content += f"   Expires: Never\n"
+                
+            if created:
+                text_content += f"   Created: {created}\n"
+            
+            text_content += "\n"
+
+        text_content += f"\nTotal Users: {len(users)}\n"
+
+        from flask import Response
+        return Response(
+            text_content,
+            mimetype='text/plain',
+            headers={"Content-disposition": f"attachment; filename={script_name.replace(' ', '_')}_users.txt"}
+        )
+
+    except Exception as e:
+        logger.error(f"Error exporting script users: {e}")
+        from flask import Response
+        return Response(
+            f"Error exporting users: {str(e)}\n",
+            mimetype='text/plain',
+            headers={"Content-disposition": f"attachment; filename=export_error.txt"}
+        )
+
 # ===== REDIRECT ROUTES =====
 
 @app.route('/admin')

@@ -242,6 +242,9 @@
                     <button type="button" class="btn btn-sm btn-secondary ms-2" onclick="toggleSelectAllUsers()" id="selectAllUsersBtn" style="display: none;">
                         <i class="fas fa-check-square me-1"></i>Select All
                     </button>
+                    <button type="button" class="btn btn-sm btn-success ms-2" onclick="exportUsersFromModal()" id="exportUsersBtn" style="display: none;">
+                        <i class="fas fa-download me-1"></i>Export Users
+                    </button>
                 </div>
                 <div id="scriptUsersContent">
                     <div class="text-center">
@@ -428,17 +431,25 @@ function getScriptUsers(scriptId, scriptName) {
             // Show control buttons
             document.getElementById('removeSelectedBtn').style.display = 'inline-block';
             document.getElementById('selectAllUsersBtn').style.display = 'inline-block';
+            document.getElementById('exportUsersBtn').style.display = 'inline-block';
         } else {
             contentDiv.innerHTML = '<div class="alert alert-info">No users found with access to this script.</div>';
             document.getElementById('removeSelectedBtn').style.display = 'none';
             document.getElementById('selectAllUsersBtn').style.display = 'none';
+            document.getElementById('exportUsersBtn').style.display = 'none';
         }
     })
     .catch(error => {
         document.getElementById('scriptUsersContent').innerHTML = '<div class="alert alert-danger">Error loading users.</div>';
         document.getElementById('removeSelectedBtn').style.display = 'none';
         document.getElementById('selectAllUsersBtn').style.display = 'none';
+        document.getElementById('exportUsersBtn').style.display = 'none';
     });
+}
+
+function exportUsersFromModal() {
+    const scriptName = document.getElementById('scriptNameTitle').textContent;
+    exportScriptUsers(currentScriptId, scriptName);
 }
 
 function toggleSelectAllUsers() {
