@@ -187,6 +187,7 @@ def add_script():
         name = data.get('name', '').strip()
         script_id = data.get('script_id', '').strip()
         description = data.get('description', '').strip()
+        scrape_users = data.get('scrape_users', False)
 
         if not name or not script_id:
             return jsonify({"success": False, "error": "Name and Script ID are required"})
@@ -197,9 +198,80 @@ def add_script():
 
         PineScript.create(script_id, name, description, True)
 
-        return jsonify({"success": True})
+        response_data = {"success": True, "message": "Script added successfully"}
+
+        # Optionally scrape users if requested
+        if scrape_users:
+            scrape_result = tv_api.scrape_all_users_from_new_script(script_id)
+            if scrape_result.get('success', False):
+                response_data['user_data'] = scrape_result['data']
+                response_data['message'] = f"Script added successfully. Found {scrape_result['data']['total_users']} existing users."
+            else:
+                response_data['scrape_error'] = scrape_result.get('error', 'Failed to scrape users')
+
+        return jsonify(response_data)
     except Exception as e:
         logger.error(f"Error adding script: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/scrape-script-users/<script_id>', methods=['POST'])
+def scrape_script_users(script_id):
+    """Scrape all users from a specific script"""
+    try:
+        # Check if script exists
+        script = PineScript.get(script_id)
+        if not script:
+            return jsonify({"success": False, "error": "Script not found"})
+
+        # Scrape users from the script
+        result = tv_api.scrape_all_users_from_new_script(script_id)
+        
+        if result.get('success', False):
+            return jsonify({
+                "success": True,
+                "script_name": script.name,
+                "user_data": result['data']
+            })
+        else:
+            return jsonify({
+                "success": False, 
+                "error": result.get('error', 'Failed to scrape users')
+            })
+            
+    except Exception as e:
+        logger.error(f"Error scraping users for script {script_id}: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/scrape-all-scripts-users', methods=['POST'])
+def scrape_all_scripts_users():
+    """Scrape all users from all active scripts"""
+    try:
+        active_scripts = PineScript.get_active()
+        if not active_scripts:
+            return jsonify({"success": False, "error": "No active scripts found"})
+
+        pine_ids = [script.pine_id for script in active_scripts]
+        
+        # Scrape users from all scripts
+        result = tv_api.scrape_all_users_from_multiple_scripts(pine_ids)
+        
+        if result.get('success', False):
+            return jsonify({
+                "success": True,
+                "summary": {
+                    "scripts_processed": result['scripts_processed'],
+                    "total_users_found": result['total_users_found']
+                },
+                "detailed_results": result['results']
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": result.get('error', 'Failed to scrape users from scripts')
+            })
+            
+    except Exception as e:
+        logger.error(f"Error scraping users from all scripts: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 @app.route('/api/remove-script', methods=['POST'])

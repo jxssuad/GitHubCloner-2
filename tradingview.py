@@ -696,5 +696,76 @@ class TradingViewAPI:
             logger.error(f"Remove access error: {e}")
             return {"success": False, "message": str(e)}
 
+    def scrape_all_users_from_new_script(self, pine_id):
+        """Scrape all users from a newly added script and return user data"""
+        try:
+            logger.info(f"Starting to scrape all users from new script: {pine_id}")
+            
+            users = self.get_script_users(pine_id)
+            
+            if users:
+                logger.info(f"Successfully scraped {len(users)} users from script {pine_id}")
+                
+                # Format user data for easy consumption
+                user_summary = {
+                    'script_id': pine_id,
+                    'total_users': len(users),
+                    'lifetime_users': len([u for u in users if u.get('has_lifetime_access', False)]),
+                    'temporary_users': len([u for u in users if not u.get('has_lifetime_access', False)]),
+                    'users': users
+                }
+                
+                # Log summary
+                logger.info(f"Script {pine_id} user summary: {user_summary['total_users']} total, "
+                           f"{user_summary['lifetime_users']} lifetime, "
+                           f"{user_summary['temporary_users']} temporary")
+                
+                return {"success": True, "data": user_summary}
+            else:
+                logger.info(f"No users found for script {pine_id}")
+                return {"success": True, "data": {
+                    'script_id': pine_id,
+                    'total_users': 0,
+                    'lifetime_users': 0,
+                    'temporary_users': 0,
+                    'users': []
+                }}
+                
+        except Exception as e:
+            logger.error(f"Error scraping users from script {pine_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def scrape_all_users_from_multiple_scripts(self, pine_ids):
+        """Scrape all users from multiple newly added scripts"""
+        try:
+            logger.info(f"Starting to scrape users from {len(pine_ids)} scripts")
+            
+            results = []
+            total_users_across_scripts = 0
+            
+            for pine_id in pine_ids:
+                result = self.scrape_all_users_from_new_script(pine_id)
+                results.append(result)
+                
+                if result.get('success', False):
+                    total_users_across_scripts += result['data']['total_users']
+                
+                # Add delay between scripts to avoid rate limiting
+                time.sleep(0.3)
+            
+            logger.info(f"Completed scraping users from {len(pine_ids)} scripts. "
+                       f"Total users found: {total_users_across_scripts}")
+            
+            return {
+                "success": True,
+                "scripts_processed": len(pine_ids),
+                "total_users_found": total_users_across_scripts,
+                "results": results
+            }
+            
+        except Exception as e:
+            logger.error(f"Error scraping users from multiple scripts: {e}")
+            return {"success": False, "error": str(e)}
+
 # Global API instance
 tv_api = TradingViewAPI()
