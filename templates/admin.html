@@ -399,16 +399,22 @@ document.getElementById('accessForm').addEventListener('submit', function(e) {
 
 function toggleSelectAll() {
     const checkboxes = document.querySelectorAll('.script-checkbox');
-    allSelected = !allSelected;
-
+    const btn = event.target.closest('button');
+    
+    // Check current state based on actual checkboxes
+    const checkedCount = document.querySelectorAll('.script-checkbox:checked').length;
+    const shouldSelectAll = checkedCount === 0;
+    
     checkboxes.forEach(cb => {
-        cb.checked = allSelected;
+        cb.checked = shouldSelectAll;
     });
 
-    const btn = event.target.closest('button');
-    btn.innerHTML = allSelected 
+    // Update button text based on new state
+    btn.innerHTML = shouldSelectAll 
         ? '<i class="fas fa-square me-1"></i>Deselect All'
         : '<i class="fas fa-check-square me-1"></i>Select All';
+        
+    allSelected = shouldSelectAll;
 }
 
 function toggleCustomDuration() {
@@ -436,7 +442,7 @@ function getScriptUsers(scriptId, scriptName) {
         const contentDiv = document.getElementById('scriptUsersContent');
 
         if (data.success && data.users.length > 0) {
-            let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th><input type="checkbox" id="selectAllUsers" onchange="toggleSelectAllUsers()"></th><th>Username</th><th>Access Type</th><th>Expiration</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+            let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th><input type="checkbox" id="selectAllUsers" onchange="toggleSelectAllUsersFromCheckbox()"></th><th>Username</th><th>Access Type</th><th>Expiration</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
 
             data.users.forEach((user, index) => {
                 html += `
@@ -486,18 +492,26 @@ function exportUsersFromModal() {
 function toggleSelectAllUsers() {
     const checkboxes = document.querySelectorAll('.user-checkbox');
     const selectAllCheckbox = document.getElementById('selectAllUsers');
-    allUsersSelected = !allUsersSelected;
+    const btn = document.getElementById('selectAllUsersBtn');
+    
+    // Check current state based on actual checkboxes
+    const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
+    const shouldSelectAll = checkedCount === 0;
 
     checkboxes.forEach(cb => {
-        cb.checked = allUsersSelected;
+        cb.checked = shouldSelectAll;
     });
 
-    selectAllCheckbox.checked = allUsersSelected;
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = shouldSelectAll;
+    }
 
-    const btn = document.getElementById('selectAllUsersBtn');
-    btn.innerHTML = allUsersSelected 
+    // Update button text based on new state
+    btn.innerHTML = shouldSelectAll 
         ? '<i class="fas fa-square me-1"></i>Deselect All'
         : '<i class="fas fa-check-square me-1"></i>Select All';
+        
+    allUsersSelected = shouldSelectAll;
 }
 
 function removeSelectedUsers() {
@@ -542,6 +556,27 @@ function removeSelectedUsers() {
         // Fix any modal backdrop issues
         fixModalBackdrop();
     });
+}
+
+function toggleSelectAllUsersFromCheckbox() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllUsers');
+    const btn = document.getElementById('selectAllUsersBtn');
+    
+    const shouldSelectAll = selectAllCheckbox.checked;
+
+    checkboxes.forEach(cb => {
+        cb.checked = shouldSelectAll;
+    });
+
+    // Update button text based on checkbox state
+    if (btn) {
+        btn.innerHTML = shouldSelectAll 
+            ? '<i class="fas fa-square me-1"></i>Deselect All'
+            : '<i class="fas fa-check-square me-1"></i>Select All';
+    }
+        
+    allUsersSelected = shouldSelectAll;
 }
 
 function removeSingleUser(username) {
