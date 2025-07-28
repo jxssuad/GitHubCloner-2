@@ -475,16 +475,22 @@ class TradingViewAPI:
             return None
 
     def get_script_users(self, pine_id):
-        """Get all usernames that have access to a specific Pine Script with pagination"""
+        """Get all usernames that have access to a specific Pine Script with comprehensive pagination"""
         try:
             if not self._ensure_authenticated():
                 return []
 
             all_users = []
             offset = 0
-            limit = 100  # Fetch in batches of 100
+            limit = 50  # Use smaller batches to ensure we get all results
+            max_attempts = 100  # Safety limit to prevent infinite loops
+            attempts = 0
             
-            while True:
+            logger.info(f"Starting to fetch all users for {pine_id}")
+            
+            while attempts < max_attempts:
+                attempts += 1
+                
                 # Use TradingView's list_users API to get users with pagination
                 list_users_url = f"{self.base_url}/pine_perm/list_users/"
 
@@ -516,11 +522,23 @@ class TradingViewAPI:
                         data = response.json()
                         users = data.get('results', [])
                         
+                        logger.debug(f"Batch {attempts}: Got {len(users)} users at offset {offset}")
+                        logger.debug(f"API response keys: {list(data.keys())}")
+                        
+                        # Check for pagination metadata
+                        total_count = data.get('count', 0)
+                        next_url = data.get('next')
+                        has_next = data.get('has_next', False)
+                        
+                        logger.debug(f"Total count in API: {total_count}, has_next: {has_next}, next_url: {next_url}")
+                        
                         # No more users to fetch
                         if not users:
+                            logger.info(f"No more users found at offset {offset}")
                             break
                             
                         # Add users from this batch
+                        batch_count = 0
                         for user in users:
                             user_info = {
                                 'username': user.get('username', ''),
@@ -529,30 +547,64 @@ class TradingViewAPI:
                                 'has_lifetime_access': user.get('expiration') is None
                             }
                             all_users.append(user_info)
+                            batch_count += 1
 
-                        # If we got fewer results than the limit, we've reached the end
+                        logger.info(f"Added {batch_count} users from batch {attempts}, total now: {len(all_users)}")
+
+                        # Check multiple exit conditions
+                        # 1. If API says no more pages
+                        if not has_next and next_url is None:
+                            logger.info("API indicates no more pages")
+                            break
+                            
+                        # 2. If we got fewer results than requested
                         if len(users) < limit:
+                            logger.info(f"Got {len(users)} users (less than limit {limit}), assuming end")
+                            break
+                            
+                        # 3. If total_count is available and we've reached it
+                        if total_count > 0 and len(all_users) >= total_count:
+                            logger.info(f"Reached total count: {len(all_users)}/{total_count}")
                             break
                             
                         # Move to next batch
                         offset += limit
-                        logger.debug(f"Fetched {len(users)} users (batch {offset//limit}), total so far: {len(all_users)}")
                         
-                        # Add small delay between requests to avoid rate limiting
-                        time.sleep(0.1)
+                        # Add delay between requests to avoid rate limiting
+                        time.sleep(0.2)
 
                     except Exception as e:
-                        logger.error(f"Error parsing users data for {pine_id}: {e}")
-                        break
+                        logger.error(f"Error parsing users data for {pine_id} at batch {attempts}: {e}")
+                        # Try to continue with next batch in case it was a temporary error
+                        offset += limit
+                        continue
                 else:
-                    logger.error(f"API request failed with status {response.status_code}")
-                    break
+                    logger.error(f"API request failed with status {response.status_code} at batch {attempts}")
+                    # Try a few more times with increasing delays
+                    if attempts < 3:
+                        time.sleep(1)
+                        continue
+                    else:
+                        break
 
-            logger.info(f"Found {len(all_users)} total users with access to {pine_id}")
-            return all_users
+            logger.info(f"Completed fetching users for {pine_id}: Found {len(all_users)} total users in {attempts} attempts")
+            
+            # Remove duplicates based on username (just in case)
+            unique_users = []
+            seen_usernames = set()
+            for user in all_users:
+                username = user.get('username', '').lower()
+                if username and username not in seen_usernames:
+                    unique_users.append(user)
+                    seen_usernames.add(username)
+            
+            if len(unique_users) != len(all_users):
+                logger.info(f"Removed {len(all_users) - len(unique_users)} duplicate users")
+            
+            return unique_users
 
         except Exception as e:
-            logger.error(f"Error getting script users: {e}")
+            logger.error(f"Error getting script users for {pine_id}: {e}")
             return []
 
     def add_pine_permission(self, username, pine_id):
