@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block title %}TradingView Access Manager{% endblock %}
@@ -64,9 +63,14 @@
                                             <strong>{{ script.name }}</strong>
                                             <small class="text-muted d-block">{{ script.description }}</small>
                                         </label>
-                                        <button type="button" class="btn btn-sm btn-outline-info ms-2" onclick="getScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
-                                            <i class="fas fa-users me-1"></i>View Users
-                                        </button>
+                                        <div class="btn-group btn-group-sm ms-2" role="group">
+                                            <button type="button" class="btn btn-outline-info" onclick="getScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
+                                                <i class="fas fa-users me-1"></i>View Users
+                                            </button>
+                                            <button type="button" class="btn btn-outline-success" onclick="exportScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
+                                                <i class="fas fa-download me-1"></i>Export
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 {% endfor %}
@@ -262,15 +266,15 @@ let allUsersSelected = false;
 document.getElementById('validateBtn').addEventListener('click', function() {
     const username = document.getElementById('username').value.trim();
     const validationDiv = document.getElementById('usernameValidation');
-    
+
     if (!username) {
         validationDiv.innerHTML = '<span class="text-danger">Please enter a username</span>';
         return;
     }
-    
+
     this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Validating...';
     this.disabled = true;
-    
+
     fetch('/api/validate-username', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -295,27 +299,27 @@ document.getElementById('validateBtn').addEventListener('click', function() {
 // Form submission
 document.getElementById('accessForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     if (!usernameValid) {
         alert('Please validate the username first');
         return;
     }
-    
+
     const username = document.getElementById('username').value.trim();
     const selectedScripts = Array.from(document.querySelectorAll('.script-checkbox:checked')).map(cb => cb.value);
     const customDurationEnabled = document.getElementById('customDurationSwitch').checked;
     const duration = customDurationEnabled ? document.getElementById('accessDuration').value : '1L';
-    
+
     if (selectedScripts.length === 0) {
         alert('Please select at least one script');
         return;
     }
-    
+
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Granting Access...';
     submitBtn.disabled = true;
-    
+
     fetch('/api/grant-access', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -324,14 +328,14 @@ document.getElementById('accessForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         const resultDiv = document.getElementById('accessResult');
-        
+
         if (data.success) {
             let html = '<div class="alert alert-success"><h6>Access Granted Successfully!</h6><ul>';
             data.results.forEach(result => {
                 html += `<li>${result.script_name}</li>`;
             });
             html += '</ul></div>';
-            
+
             if (data.errors.length > 0) {
                 html += '<div class="alert alert-warning"><h6>Some errors occurred:</h6><ul>';
                 data.errors.forEach(error => {
@@ -339,14 +343,14 @@ document.getElementById('accessForm').addEventListener('submit', function(e) {
                 });
                 html += '</ul></div>';
             }
-            
+
             resultDiv.innerHTML = html;
-            
+
             // Reset form
             document.getElementById('accessForm').reset();
             usernameValid = false;
             document.getElementById('usernameValidation').innerHTML = '';
-            
+
             // Reload page after 3 seconds
             setTimeout(() => location.reload(), 3000);
         } else {
@@ -362,11 +366,11 @@ document.getElementById('accessForm').addEventListener('submit', function(e) {
 function toggleSelectAll() {
     const checkboxes = document.querySelectorAll('.script-checkbox');
     allSelected = !allSelected;
-    
+
     checkboxes.forEach(cb => {
         cb.checked = allSelected;
     });
-    
+
     const btn = event.target.closest('button');
     btn.innerHTML = allSelected 
         ? '<i class="fas fa-square me-1"></i>Deselect All'
@@ -376,7 +380,7 @@ function toggleSelectAll() {
 function toggleCustomDuration() {
     const durationSelector = document.getElementById('durationSelector');
     const isEnabled = document.getElementById('customDurationSwitch').checked;
-    
+
     if (isEnabled) {
         durationSelector.style.display = 'block';
     } else {
@@ -388,18 +392,18 @@ function toggleCustomDuration() {
 function getScriptUsers(scriptId, scriptName) {
     currentScriptId = scriptId;
     document.getElementById('scriptNameTitle').textContent = scriptName;
-    
+
     const modal = new bootstrap.Modal(document.getElementById('scriptUsersModal'));
     modal.show();
-    
+
     fetch(`/api/get-script-users/${scriptId}`)
     .then(response => response.json())
     .then(data => {
         const contentDiv = document.getElementById('scriptUsersContent');
-        
+
         if (data.success && data.users.length > 0) {
             let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th><input type="checkbox" id="selectAllUsers" onchange="toggleSelectAllUsers()"></th><th>Username</th><th>Access Type</th><th>Expiration</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
-            
+
             data.users.forEach((user, index) => {
                 html += `
                     <tr>
@@ -416,11 +420,11 @@ function getScriptUsers(scriptId, scriptName) {
                     </tr>
                 `;
             });
-            
+
             html += '</tbody></table></div>';
             html += `<p class="text-muted mt-3">Total users: ${data.users.length}</p>`;
             contentDiv.innerHTML = html;
-            
+
             // Show control buttons
             document.getElementById('removeSelectedBtn').style.display = 'inline-block';
             document.getElementById('selectAllUsersBtn').style.display = 'inline-block';
@@ -441,13 +445,13 @@ function toggleSelectAllUsers() {
     const checkboxes = document.querySelectorAll('.user-checkbox');
     const selectAllCheckbox = document.getElementById('selectAllUsers');
     allUsersSelected = !allUsersSelected;
-    
+
     checkboxes.forEach(cb => {
         cb.checked = allUsersSelected;
     });
-    
+
     selectAllCheckbox.checked = allUsersSelected;
-    
+
     const btn = document.getElementById('selectAllUsersBtn');
     btn.innerHTML = allUsersSelected 
         ? '<i class="fas fa-square me-1"></i>Deselect All'
@@ -456,21 +460,21 @@ function toggleSelectAllUsers() {
 
 function removeSelectedUsers() {
     const selectedUsers = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
-    
+
     if (selectedUsers.length === 0) {
         alert('Please select at least one user to remove');
         return;
     }
-    
+
     if (!confirm(`Are you sure you want to remove access for ${selectedUsers.length} user(s)?`)) {
         return;
     }
-    
+
     const btn = document.getElementById('removeSelectedBtn');
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Removing...';
     btn.disabled = true;
-    
+
     fetch('/api/bulk-remove-access', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -498,7 +502,7 @@ function removeSelectedUsers() {
 
 function removeSingleUser(username) {
     if (!confirm(`Remove access for ${username}?`)) return;
-    
+
     fetch('/api/remove-access', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -520,12 +524,12 @@ function addScript() {
     const name = document.getElementById('scriptName').value.trim();
     const scriptId = document.getElementById('scriptId').value.trim();
     const description = document.getElementById('scriptDescription').value.trim();
-    
+
     if (!name || !scriptId) {
         alert('Please fill in required fields');
         return;
     }
-    
+
     fetch('/api/add-script', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -543,7 +547,7 @@ function addScript() {
 
 function removeScript(scriptId) {
     if (!confirm('Are you sure you want to remove this script?')) return;
-    
+
     fetch('/api/remove-script', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -561,7 +565,7 @@ function removeScript(scriptId) {
 
 function removeUserAccess(username, scriptId) {
     if (!confirm(`Remove access for ${username}?`)) return;
-    
+
     fetch('/api/remove-access', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -574,6 +578,21 @@ function removeUserAccess(username, scriptId) {
         } else {
             alert(data.message);
         }
+    });
+}
+
+function exportScriptUsers(scriptId, scriptName) {
+    fetch(`/api/export-script-users/${scriptId}`)
+    .then(response => response.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${scriptName.replace(/[^a-zA-Z0-9]/g, '_')}_users.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
     });
 }
 </script>
