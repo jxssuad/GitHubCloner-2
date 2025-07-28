@@ -475,60 +475,81 @@ class TradingViewAPI:
             return None
 
     def get_script_users(self, pine_id):
-        """Get all usernames that have access to a specific Pine Script"""
+        """Get all usernames that have access to a specific Pine Script with pagination"""
         try:
             if not self._ensure_authenticated():
                 return []
 
-            # Use TradingView's list_users API to get all users with access
-            list_users_url = f"{self.base_url}/pine_perm/list_users/"
+            all_users = []
+            offset = 0
+            limit = 100  # Fetch in batches of 100
+            
+            while True:
+                # Use TradingView's list_users API to get users with pagination
+                list_users_url = f"{self.base_url}/pine_perm/list_users/"
 
-            from urllib3 import encode_multipart_formdata
-            payload = {
-                'pine_id': pine_id,
-                'limit': 1000,  # Get up to 1000 users
-                'order_by': '-created'
-            }
+                from urllib3 import encode_multipart_formdata
+                payload = {
+                    'pine_id': pine_id,
+                    'limit': limit,
+                    'offset': offset,
+                    'order_by': '-created'
+                }
 
-            body, content_type = encode_multipart_formdata(payload)
+                body, content_type = encode_multipart_formdata(payload)
 
-            headers = {
-                'Origin': self.base_url,
-                'Content-Type': content_type,
-                'Cookie': f'sessionid={self._get_session_id()}',
-                'Referer': f"{self.base_url}/"
-            }
+                headers = {
+                    'Origin': self.base_url,
+                    'Content-Type': content_type,
+                    'Cookie': f'sessionid={self._get_session_id()}',
+                    'Referer': f"{self.base_url}/"
+                }
 
-            response = self.session.post(
-                list_users_url,
-                data=body,
-                headers=headers
-            )
+                response = self.session.post(
+                    list_users_url,
+                    data=body,
+                    headers=headers
+                )
 
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    users = data.get('results', [])
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                        users = data.get('results', [])
+                        
+                        # No more users to fetch
+                        if not users:
+                            break
+                            
+                        # Add users from this batch
+                        for user in users:
+                            user_info = {
+                                'username': user.get('username', ''),
+                                'expiration': user.get('expiration'),
+                                'created': user.get('created'),
+                                'has_lifetime_access': user.get('expiration') is None
+                            }
+                            all_users.append(user_info)
 
-                    user_list = []
-                    for user in users:
-                        user_info = {
-                            'username': user.get('username', ''),
-                            'expiration': user.get('expiration'),
-                            'created': user.get('created'),
-                            'has_lifetime_access': user.get('expiration') is None
-                        }
-                        user_list.append(user_info)
+                        # If we got fewer results than the limit, we've reached the end
+                        if len(users) < limit:
+                            break
+                            
+                        # Move to next batch
+                        offset += limit
+                        logger.debug(f"Fetched {len(users)} users (batch {offset//limit}), total so far: {len(all_users)}")
+                        
+                        # Add small delay between requests to avoid rate limiting
+                        time.sleep(0.1)
 
-                    logger.info(f"Found {len(user_list)} users with access to {pine_id}")
-                    return user_list
+                    except Exception as e:
+                        logger.error(f"Error parsing users data for {pine_id}: {e}")
+                        break
+                else:
+                    logger.error(f"API request failed with status {response.status_code}")
+                    break
 
-                except Exception as e:
-                    logger.error(f"Error parsing users data for {pine_id}: {e}")
-                    return []
-            else:
-                logger.info(f"No users found with access to {pine_id}")
-                return []
+            logger.info(f"Found {len(all_users)} total users with access to {pine_id}")
+            return all_users
 
         except Exception as e:
             logger.error(f"Error getting script users: {e}")
