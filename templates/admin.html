@@ -60,7 +60,7 @@
                                     <div class="form-check">
                                         <input class="form-check-input script-checkbox" type="checkbox" value="{{ script.pine_id }}" id="script{{ loop.index }}">
                                         <label class="form-check-label" for="script{{ loop.index }}">
-                                            <strong>{{ script.name }}</strong>
+                                            <strong class="text-primary">{{ script.name }}</strong>
                                             <small class="text-muted d-block">{{ script.description }}</small>
                                         </label>
                                         <div class="btn-group btn-group-sm ms-2" role="group">
@@ -264,6 +264,18 @@ let usernameValid = false;
 let allSelected = false;
 let currentScriptId = '';
 let allUsersSelected = false;
+
+// Fix modal backdrop issues
+function fixModalBackdrop() {
+    // Remove any lingering modal backdrops
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(backdrop => backdrop.remove());
+    
+    // Remove modal-open class from body
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+}
 
 // Username validation
 document.getElementById('validateBtn').addEventListener('click', function() {
@@ -508,6 +520,8 @@ function removeSelectedUsers() {
     .finally(() => {
         btn.innerHTML = originalText;
         btn.disabled = false;
+        // Fix any modal backdrop issues
+        fixModalBackdrop();
     });
 }
 
@@ -528,6 +542,10 @@ function removeSingleUser(username) {
         } else {
             alert(data.message);
         }
+    })
+    .finally(() => {
+        // Fix any modal backdrop issues
+        fixModalBackdrop();
     });
 }
 
@@ -606,5 +624,22 @@ function exportScriptUsers(scriptId, scriptName) {
         window.URL.revokeObjectURL(url);
     });
 }
+
+// Fix modal backdrop issues when modals are closed
+document.addEventListener('DOMContentLoaded', function() {
+    const scriptUsersModal = document.getElementById('scriptUsersModal');
+    if (scriptUsersModal) {
+        scriptUsersModal.addEventListener('hidden.bs.modal', function () {
+            fixModalBackdrop();
+        });
+    }
+    
+    const addScriptModal = document.getElementById('addScriptModal');
+    if (addScriptModal) {
+        addScriptModal.addEventListener('hidden.bs.modal', function () {
+            fixModalBackdrop();
+        });
+    }
+});
 </script>
 {% endblock %}
