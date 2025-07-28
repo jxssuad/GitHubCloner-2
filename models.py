@@ -11,10 +11,8 @@ pine_scripts = {}
 class AccessKey:
     """In-memory access key storage"""
     
-    def __init__(self, key_code, email="", name=""):
+    def __init__(self, key_code):
         self.key_code = key_code
-        self.email = email
-        self.name = name
         self.created_at = datetime.utcnow()
         self.is_used = False
         self.used_at = None
@@ -29,9 +27,9 @@ class AccessKey:
                 return key
     
     @staticmethod
-    def create(key_code, email="", name=""):
+    def create(key_code):
         """Create and store a new access key"""
-        key = AccessKey(key_code, email, name)
+        key = AccessKey(key_code)
         access_keys[key_code] = key
         return key
     
