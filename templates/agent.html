@@ -1,0 +1,378 @@
+
+{% extends "base.html" %}
+
+{% block title %}Agent Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1><i class="fas fa-user-tie text-primary me-2"></i>Agent Dashboard</h1>
+            <p class="text-muted">Grant access to Pine Scripts for users</p>
+        </div>
+    </div>
+
+    <!-- Grant Access Section -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-user-plus me-2"></i>Grant Script Access</h5>
+                </div>
+                <div class="card-body">
+                    <form id="agentAccessForm">
+                        <div class="mb-3">
+                            <label for="agentUsername" class="form-label">TradingView Username</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="agentUsername" placeholder="Enter username">
+                                <button class="btn btn-outline-secondary" type="button" id="agentValidateBtn">
+                                    <i class="fas fa-check me-1"></i>Validate
+                                </button>
+                            </div>
+                            <div id="agentUsernameValidation" class="form-text"></div>
+                        </div>
+
+                        <div class="mb-3" id="agentScriptSelection" style="display: none;">
+                            <label class="form-label">Select Pine Scripts</label>
+                            <div class="script-selection-area" id="agentScriptsList">
+                                <!-- Scripts will be loaded here -->
+                            </div>
+                        </div>
+
+                        <div class="mb-3" id="agentDurationSection" style="display: none;">
+                            <label class="form-label">Access Duration</label>
+                            <div class="d-flex align-items-center mb-3 p-3 bg-dark rounded">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="agentCustomDurationSwitch" onchange="toggleAgentCustomDuration()">
+                                    <label class="form-check-label text-white" for="agentCustomDurationSwitch">
+                                        Enable Custom Duration (Default: Lifetime Access)
+                                    </label>
+                                </div>
+                            </div>
+                            <div id="agentDurationSelector" style="display: none;">
+                                <select class="form-select" id="agentAccessDuration">
+                                    <option value="1L">Lifetime Access</option>
+                                    <option value="1D">1 Day</option>
+                                    <option value="7D">7 Days</option>
+                                    <option value="30D">30 Days</option>
+                                    <option value="90D">90 Days</option>
+                                    <option value="1Y">1 Year</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success" id="agentGrantBtn" style="display: none;">
+                            <i class="fas fa-plus me-2"></i>Generate Access
+                        </button>
+                    </form>
+
+                    <div id="agentAccessResult" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Scripts -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-script me-2"></i>Available Scripts</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group" style="max-height: 400px; overflow-y: auto;" id="agentAvailableScripts">
+                        <div class="text-center text-muted py-4">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mb-0 mt-2">Loading scripts...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Access Logs -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-history me-2"></i>Recent Access Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Script</th>
+                                    <th>Operation</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="agentAccessLogs">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span class="ms-2">Loading activity...</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let agentUsernameValid = false;
+let agentScripts = [];
+
+// Load scripts and logs on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAgentScripts();
+    loadAgentLogs();
+    
+    // Auto-refresh logs every 30 seconds
+    setInterval(loadAgentLogs, 30000);
+});
+
+// Username validation
+document.getElementById('agentValidateBtn').addEventListener('click', function() {
+    const username = document.getElementById('agentUsername').value.trim();
+    const validationDiv = document.getElementById('agentUsernameValidation');
+
+    if (!username) {
+        validationDiv.innerHTML = '<span class="text-danger">Please enter a username</span>';
+        return;
+    }
+
+    this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Validating...';
+    this.disabled = true;
+
+    fetch('/api/validate-username', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: username})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            validationDiv.innerHTML = `<span class="text-success"><i class="fas fa-check me-1"></i>Valid user: ${data.verified_name}</span>`;
+            agentUsernameValid = true;
+            showAgentScriptSelection();
+        } else {
+            validationDiv.innerHTML = `<span class="text-danger"><i class="fas fa-times me-1"></i>${data.error}</span>`;
+            agentUsernameValid = false;
+            hideAgentScriptSelection();
+        }
+    })
+    .finally(() => {
+        this.innerHTML = '<i class="fas fa-check me-1"></i>Validate';
+        this.disabled = false;
+    });
+});
+
+// Form submission
+document.getElementById('agentAccessForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    if (!agentUsernameValid) {
+        alert('Please validate the username first');
+        return;
+    }
+
+    const username = document.getElementById('agentUsername').value.trim();
+    const selectedScripts = Array.from(document.querySelectorAll('.agent-script-checkbox:checked')).map(cb => cb.value);
+    const customDurationEnabled = document.getElementById('agentCustomDurationSwitch').checked;
+    const duration = customDurationEnabled ? document.getElementById('agentAccessDuration').value : '1L';
+
+    if (selectedScripts.length === 0) {
+        alert('Please select at least one script');
+        return;
+    }
+
+    const submitBtn = document.getElementById('agentGrantBtn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating Access...';
+    submitBtn.disabled = true;
+
+    fetch('/api/grant-access', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: username, scripts: selectedScripts, duration: duration})
+    })
+    .then(response => response.json())
+    .then(data => {
+        const resultDiv = document.getElementById('agentAccessResult');
+
+        if (data.success) {
+            let html = '<div class="alert alert-success"><h6>Access Generated Successfully!</h6><ul>';
+            data.results.forEach(result => {
+                html += `<li>${result.script_name}</li>`;
+            });
+            html += '</ul></div>';
+
+            if (data.errors.length > 0) {
+                html += '<div class="alert alert-warning"><h6>Some errors occurred:</h6><ul>';
+                data.errors.forEach(error => {
+                    html += `<li>${error.script_name}: ${error.error}</li>`;
+                });
+                html += '</ul></div>';
+            }
+
+            resultDiv.innerHTML = html;
+
+            // Reset form
+            document.getElementById('agentAccessForm').reset();
+            agentUsernameValid = false;
+            document.getElementById('agentUsernameValidation').innerHTML = '';
+            hideAgentScriptSelection();
+
+            // Reload logs
+            setTimeout(() => loadAgentLogs(), 2000);
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        }
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+function loadAgentScripts() {
+    fetch('/api/get-scripts')
+    .then(response => response.json())
+    .then(data => {
+        agentScripts = data.scripts;
+        updateAgentScriptsList();
+        updateAgentAvailableScripts();
+    })
+    .catch(error => {
+        console.error('Error loading scripts:', error);
+    });
+}
+
+function updateAgentScriptsList() {
+    const container = document.getElementById('agentScriptsList');
+    
+    if (agentScripts.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-code fa-2x mb-2"></i><p class="mb-0">No scripts available</p></div>';
+        return;
+    }
+
+    let html = '';
+    agentScripts.forEach((script, index) => {
+        html += `
+            <div class="script-checkbox-container mb-2">
+                <div class="form-check">
+                    <input class="form-check-input agent-script-checkbox" type="checkbox" value="${script.pine_id}" id="agentScript${index}">
+                    <label class="form-check-label" for="agentScript${index}">
+                        <strong>${script.name}</strong>
+                        ${script.description ? `<small class="d-block text-muted">${script.description}</small>` : ''}
+                    </label>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function updateAgentAvailableScripts() {
+    const container = document.getElementById('agentAvailableScripts');
+    
+    if (agentScripts.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-code fa-2x mb-2"></i><p class="mb-0">No scripts available</p></div>';
+        return;
+    }
+
+    let html = '';
+    agentScripts.forEach(script => {
+        html += `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <strong class="text-primary">${script.name}</strong>
+                        <small class="text-muted d-block font-monospace">${script.pine_id}</small>
+                        ${script.description ? `<small class="text-info d-block mt-1">${script.description}</small>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function loadAgentLogs() {
+    fetch('/api/get-access-logs')
+    .then(response => response.json())
+    .then(data => {
+        const tbody = document.getElementById('agentAccessLogs');
+        
+        if (!data.logs || data.logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No recent activity</td></tr>';
+            return;
+        }
+
+        let html = '';
+        data.logs.slice(0, 10).forEach(log => {
+            html += `
+                <tr>
+                    <td><strong>${log.username}</strong></td>
+                    <td>${log.pine_script_name}</td>
+                    <td>
+                        <span class="badge bg-${log.operation === 'grant' ? 'success' : 'warning'}">
+                            ${log.operation.charAt(0).toUpperCase() + log.operation.slice(1)}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-${log.status === 'success' ? 'success' : 'danger'}">
+                            ${log.status.charAt(0).toUpperCase() + log.status.slice(1)}
+                        </span>
+                    </td>
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    })
+    .catch(error => {
+        console.error('Error loading logs:', error);
+        document.getElementById('agentAccessLogs').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading activity</td></tr>';
+    });
+}
+
+function showAgentScriptSelection() {
+    document.getElementById('agentScriptSelection').style.display = 'block';
+    document.getElementById('agentDurationSection').style.display = 'block';
+    document.getElementById('agentGrantBtn').style.display = 'inline-block';
+}
+
+function hideAgentScriptSelection() {
+    document.getElementById('agentScriptSelection').style.display = 'none';
+    document.getElementById('agentDurationSection').style.display = 'none';
+    document.getElementById('agentGrantBtn').style.display = 'none';
+}
+
+function toggleAgentCustomDuration() {
+    const durationSelector = document.getElementById('agentDurationSelector');
+    const isEnabled = document.getElementById('agentCustomDurationSwitch').checked;
+
+    if (isEnabled) {
+        durationSelector.style.display = 'block';
+    } else {
+        durationSelector.style.display = 'none';
+        document.getElementById('agentAccessDuration').value = '1L';
+    }
+}
+</script>
+{% endblock %}
