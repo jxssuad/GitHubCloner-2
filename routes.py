@@ -93,12 +93,19 @@ def admin_logout():
     session.pop('admin_authenticated', None)
     return redirect(url_for('admin_login'))
 
-# Middleware to protect admin routes
+# Middleware to protect routes
 @app.before_request
-def protect_admin_routes():
-    if request.path.startswith('/admin') and request.path != '/admin/login' and request.path != '/admin/logout':
-        if not session.get('admin_authenticated'):
-            return redirect(url_for('admin_login'))
+def protect_routes():
+    # Protect admin routes
+    if request.path == '/' or request.path.startswith('/admin'):
+        if request.path not in ['/admin/login', '/admin/logout']:
+            if not session.get('admin_authenticated'):
+                return redirect(url_for('admin_login'))
+    
+    # Protect agent routes  
+    if request.path.startswith('/agent') and request.path != '/agent/login' and request.path != '/agent/logout':
+        if not session.get('agent_authenticated'):
+            return redirect(url_for('agent_login'))
 
 
 # ===== API ROUTES =====
@@ -399,13 +406,11 @@ def export_script_users(script_id):
             headers={"Content-disposition": f"attachment; filename=export_error.txt"}
         )
 
-# ===== API ENDPOINTS FOR AGENT PAGE =====
+# ===== SHARED API ENDPOINTS =====
 
-@app.route('/api/agent/scripts', methods=['GET'])
-def get_agent_scripts():
-    """Get all available scripts for the agent"""
-    if not session.get('agent_authenticated'):
-        return jsonify({"success": False, "error": "Unauthorized"}), 401
+@app.route('/api/get-scripts')
+def get_scripts():
+    """Get all scripts"""
     try:
         scripts = PineScript.get_all()
         scripts_data = []
@@ -419,51 +424,30 @@ def get_agent_scripts():
 
         return jsonify({"success": True, "scripts": scripts_data})
     except Exception as e:
-        logger.error(f"Error getting scripts for agent: {e}")
+        logger.error(f"Error getting scripts: {e}")
         return jsonify({"success": False, "error": str(e)})
 
-@app.route('/api/agent/grant-access', methods=['POST'])
-def agent_grant_access():
-    """Grant access to selected Pine Scripts for the agent"""
-    if not session.get('agent_authenticated'):
-        return jsonify({"success": False, "error": "Unauthorized"}), 401
+@app.route('/api/get-access-logs')
+def get_access_logs():
+    """Get access logs"""
     try:
-        data = request.get_json()
-        username = data.get('username', '').strip()
-        selected_script_id = data.get('script_id') # Agent selects one script at a time
+        logs = AccessLog.get_all()
+        logs_data = []
 
-        if not username:
-            return jsonify({"success": False, "error": "Username is required"})
-        if not selected_script_id:
-            return jsonify({"success": False, "error": "Please select a script"})
+        for log in logs:
+            logs_data.append({
+                'username': log.username,
+                'pine_id': log.pine_id,
+                'pine_script_name': log.pine_script_name,
+                'operation': log.operation,
+                'status': log.status,
+                'timestamp': log.timestamp.isoformat() if log.timestamp else '',
+                'details': log.details
+            })
 
-        script = PineScript.get(selected_script_id)
-        if not script:
-            return jsonify({"success": False, "error": "Script not found"})
-
-        # Grant access via TradingView API (default to lifetime for agent)
-        result = tv_api.add_pine_permission(username, selected_script_id)
-        success = result.get('success', False)
-        status = "success" if success else "failure"
-        script_name = script.name
-
-        # Log the operation
-        AccessLog.create(
-            username=username,
-            pine_id=selected_script_id,
-            pine_script_name=script_name,
-            operation="grant_agent",
-            status=status,
-            details=f"Agent grant - {result.get('message', '')}"
-        )
-
-        return jsonify({
-            "success": success,
-            "message": result.get('message', 'Access granted successfully') if success else result.get('message', 'Failed to grant access')
-        })
-
+        return jsonify({"success": True, "logs": logs_data})
     except Exception as e:
-        logger.error(f"Error granting access for agent: {e}")
+        logger.error(f"Error getting access logs: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 
