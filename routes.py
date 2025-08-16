@@ -1,26 +1,14 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
-from models import PineScript, AccessLog, initialize_default_scripts
+from flask import render_template, request, jsonify, session, redirect, url_for
+from app import app
+from models import AccessLog, PineScript, initialize_default_scripts
 from tradingview import TradingViewAPI
 from datetime import datetime
 import logging
-import os
-
-app = Flask(__name__)
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'a_very_secret_key_for_development')
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
 
 # Initialize TradingView API
 tv_api = TradingViewAPI()
-
-# --- Authentication Keys ---
-AGENT_KEY = "AGENTPRO1322"
-ADMIN_KEY = "CLIPYWAY1322"
 
 # ===== MAIN ROUTES =====
 
@@ -46,69 +34,6 @@ def index():
                          access_logs=access_logs[:20],  # Show last 20 logs
                          total_scripts=total_scripts,
                          total_access=total_access)
-
-# --- Agent Page Routes ---
-
-@app.route('/agent')
-def agent_dashboard():
-    """Agent dashboard - generate access"""
-    if not session.get('agent_authenticated'):
-        return redirect(url_for('agent_login'))
-    return render_template('agent.html')
-
-@app.route('/agent_login', methods=['GET', 'POST'])
-def agent_login():
-    """Login for agent page"""
-    if request.method == 'POST':
-        key = request.form.get('key')
-        if key == AGENT_KEY:
-            session['agent_authenticated'] = True
-            return redirect(url_for('agent_dashboard'))
-        else:
-            return render_template('agent_login.html', error="Invalid Agent Key")
-    return render_template('agent_login.html')
-
-@app.route('/agent_logout')
-def agent_logout():
-    """Logout from agent page"""
-    session.pop('agent_authenticated', None)
-    return redirect(url_for('agent_login'))
-
-# --- Admin Page Authentication ---
-@app.route('/admin_login', methods=['GET', 'POST'])
-def admin_login():
-    """Login for admin page"""
-    if request.method == 'POST':
-        key = request.form.get('key')
-        if key == ADMIN_KEY:
-            session['admin_authenticated'] = True
-            return redirect(url_for('index')) # Redirect to the main admin dashboard
-        else:
-            return render_template('admin_login.html', error="Invalid Admin Key")
-    return render_template('admin_login.html')
-
-@app.route('/admin_logout')
-def admin_logout():
-    """Logout from admin page"""
-    session.pop('admin_authenticated', None)
-    return redirect(url_for('admin_login'))
-
-# Middleware to protect routes
-@app.before_request
-def protect_routes():
-    # Protect admin routes
-    if request.path == '/' or request.path.startswith('/admin'):
-        if request.path not in ['/admin_login', '/admin_logout']:
-            if not session.get('admin_authenticated'):
-                return redirect(url_for('admin_login'))
-    
-    # Protect agent routes  
-    if request.path.startswith('/agent') and request.path not in ['/agent_login', '/agent_logout']:
-        if not session.get('agent_authenticated'):
-            return redirect(url_for('agent_login'))
-
-
-# ===== API ROUTES =====
 
 @app.route('/api/validate-username', methods=['POST'])
 def validate_username():
@@ -350,7 +275,7 @@ def export_script_users(script_id):
     try:
         # Get users from TradingView API
         users = tv_api.get_script_users(script_id)
-
+        
         script = PineScript.get(script_id)
         script_name = script.name if script else script_id
 
@@ -368,24 +293,24 @@ def export_script_users(script_id):
         text_content += f"Script ID: {script_id}\n"
         text_content += f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         text_content += "=" * 50 + "\n\n"
-
+        
         for i, user in enumerate(users, 1):
             username = user.get('username', 'Unknown')
             access_type = 'Lifetime' if user.get('has_lifetime_access', False) else 'Temporary'
             expiration = user.get('expiration')
             created = user.get('created')
-
+            
             text_content += f"{i}. {username}\n"
             text_content += f"   Access Type: {access_type}\n"
-
+            
             if expiration:
                 text_content += f"   Expires: {expiration}\n"
             else:
                 text_content += f"   Expires: Never\n"
-
+                
             if created:
                 text_content += f"   Created: {created}\n"
-
+            
             text_content += "\n"
 
         text_content += f"\nTotal Users: {len(users)}\n"
@@ -406,57 +331,7 @@ def export_script_users(script_id):
             headers={"Content-disposition": f"attachment; filename=export_error.txt"}
         )
 
-# ===== SHARED API ENDPOINTS =====
-
-@app.route('/api/get-scripts')
-def get_scripts():
-    """Get all scripts"""
-    try:
-        scripts = PineScript.get_all()
-        scripts_data = []
-
-        for script in scripts:
-            scripts_data.append({
-                'pine_id': script.pine_id,
-                'name': script.name,
-                'description': script.description
-            })
-
-        return jsonify({"success": True, "scripts": scripts_data})
-    except Exception as e:
-        logger.error(f"Error getting scripts: {e}")
-        return jsonify({"success": False, "error": str(e)})
-
-@app.route('/api/get-access-logs')
-def get_access_logs():
-    """Get access logs"""
-    try:
-        logs = AccessLog.get_all()
-        logs_data = []
-
-        for log in logs:
-            logs_data.append({
-                'username': log.username,
-                'pine_id': log.pine_id,
-                'pine_script_name': log.pine_script_name,
-                'operation': log.operation,
-                'status': log.status,
-                'timestamp': log.timestamp.isoformat() if log.timestamp else '',
-                'details': log.details
-            })
-
-        return jsonify({"success": True, "logs": logs_data})
-    except Exception as e:
-        logger.error(f"Error getting access logs: {e}")
-        return jsonify({"success": False, "error": str(e)})
-
-
 # ===== REDIRECT ROUTES =====
-
-@app.route('/login')
-def login_redirect():
-    """Redirect /login to admin login"""
-    return redirect(url_for('admin_login'))
 
 @app.route('/admin')
 def admin_redirect():
@@ -481,9 +356,3 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return "<h1>500 - Internal Server Error</h1>", 500
-
-if __name__ == '__main__':
-    # Ensure default scripts are initialized when the app starts
-    initialize_default_scripts()
-    # Use a more robust secret key in production
-    app.run(debug=True)
