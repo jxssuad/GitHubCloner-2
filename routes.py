@@ -56,7 +56,7 @@ def agent_dashboard():
         return redirect(url_for('agent_login'))
     return render_template('agent.html')
 
-@app.route('/agent/login', methods=['GET', 'POST'])
+@app.route('/agent_login', methods=['GET', 'POST'])
 def agent_login():
     """Login for agent page"""
     if request.method == 'POST':
@@ -68,14 +68,14 @@ def agent_login():
             return render_template('agent_login.html', error="Invalid Agent Key")
     return render_template('agent_login.html')
 
-@app.route('/agent/logout')
+@app.route('/agent_logout')
 def agent_logout():
     """Logout from agent page"""
     session.pop('agent_authenticated', None)
     return redirect(url_for('agent_login'))
 
 # --- Admin Page Authentication ---
-@app.route('/admin/login', methods=['GET', 'POST'])
+@app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     """Login for admin page"""
     if request.method == 'POST':
@@ -87,7 +87,7 @@ def admin_login():
             return render_template('admin_login.html', error="Invalid Admin Key")
     return render_template('admin_login.html')
 
-@app.route('/admin/logout')
+@app.route('/admin_logout')
 def admin_logout():
     """Logout from admin page"""
     session.pop('admin_authenticated', None)
@@ -98,12 +98,12 @@ def admin_logout():
 def protect_routes():
     # Protect admin routes
     if request.path == '/' or request.path.startswith('/admin'):
-        if request.path not in ['/admin/login', '/admin/logout']:
+        if request.path not in ['/admin_login', '/admin_logout']:
             if not session.get('admin_authenticated'):
                 return redirect(url_for('admin_login'))
     
     # Protect agent routes  
-    if request.path.startswith('/agent') and request.path != '/agent/login' and request.path != '/agent/logout':
+    if request.path.startswith('/agent') and request.path not in ['/agent_login', '/agent_logout']:
         if not session.get('agent_authenticated'):
             return redirect(url_for('agent_login'))
 
