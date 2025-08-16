@@ -66,6 +66,15 @@
                                             {% endif %}
                                         </label>
                                     </div>
+                                    <div class="form-check form-switch mt-2 mb-2">
+                                        <input class="form-check-input" type="checkbox" 
+                                               id="mainAgentToggle{{ loop.index }}" 
+                                               {% if script.is_visible_to_agent %}checked{% endif %}
+                                               onchange="toggleAgentVisibility('{{ script.pine_id }}', this)">
+                                        <label class="form-check-label small" for="mainAgentToggle{{ loop.index }}">
+                                            Agent Access
+                                        </label>
+                                    </div>
                                     <div class="btn-group btn-group-sm" role="group">
                                         <button type="button" class="btn btn-outline-info" onclick="getScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
                                             <i class="fas fa-users me-1"></i>View Users
@@ -145,6 +154,15 @@
                                 {% if script.description %}
                                 <small class="text-info d-block mt-1">{{ script.description }}</small>
                                 {% endif %}
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" 
+                                           id="agentToggle{{ loop.index }}" 
+                                           {% if script.is_visible_to_agent %}checked{% endif %}
+                                           onchange="toggleAgentVisibility('{{ script.pine_id }}', this)">
+                                    <label class="form-check-label small" for="agentToggle{{ loop.index }}">
+                                        Agent Access
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         {% endfor %}
