@@ -453,6 +453,11 @@ def get_access_logs():
 
 # ===== REDIRECT ROUTES =====
 
+@app.route('/login')
+def login_redirect():
+    """Redirect /login to admin login"""
+    return redirect(url_for('admin_login'))
+
 @app.route('/admin')
 def admin_redirect():
     """Redirect admin to main dashboard"""
