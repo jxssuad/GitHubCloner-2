@@ -54,7 +54,7 @@ def agent_login():
         password = request.form.get('password')
         # In a real application, you would hash and check passwords against a database
         # For this example, we'll use a simple hardcoded check
-        if username == 'agent' and password == 'password123':
+        if username == 'clipyway@tele.com' and password == '1322CLIPYWAY':
             session['agent_authenticated'] = True
             return redirect(url_for('agent'))
         else:
