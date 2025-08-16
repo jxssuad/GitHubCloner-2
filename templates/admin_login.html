@@ -1,0 +1,38 @@
+
+{% extends "base.html" %}
+
+{% block title %}Admin Login - TradingView Access{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-header text-center bg-danger text-white">
+                <h3><i class="fas fa-shield-alt me-2"></i>Admin Login</h3>
+                <p class="mb-0">Access Admin Dashboard</p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>{{ error }}
+                </div>
+                {% endif %}
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="login_key" class="form-label">Admin Key</label>
+                        <input type="password" class="form-control" id="login_key" name="login_key" 
+                               placeholder="Enter admin key" required>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login as Admin
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

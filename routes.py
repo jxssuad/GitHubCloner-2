@@ -4,17 +4,26 @@ from models import AccessLog, PineScript, initialize_default_scripts
 from tradingview import TradingViewAPI
 from datetime import datetime
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 # Initialize TradingView API
 tv_api = TradingViewAPI()
 
+# Secure credentials from environment variables
+ADMIN_KEY = os.getenv('ADMIN_KEY', '1322preet')
+AGENT_USERNAME = os.getenv('AGENT_USERNAME', 'clipyway@tele.com')
+AGENT_PASSWORD = os.getenv('AGENT_PASSWORD', '1322CLIPYWAY')
+
 # ===== MAIN ROUTES =====
 
 @app.route('/')
 def index():
     """Main dashboard - manage Pine Scripts and grant access"""
+    if not session.get('admin_authenticated'):
+        return redirect(url_for('admin_login'))
+    
     # Initialize default scripts if needed
     initialize_default_scripts()
 
@@ -35,6 +44,22 @@ def index():
                          total_scripts=total_scripts,
                          total_access=total_access)
 
+@app.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        login_key = request.form.get('login_key')
+        if login_key == ADMIN_KEY:
+            session['admin_authenticated'] = True
+            return redirect(url_for('index'))
+        else:
+            return render_template('admin_login.html', error='Invalid admin key')
+    return render_template('admin_login.html')
+
+@app.route('/admin_logout')
+def admin_logout():
+    session.pop('admin_authenticated', None)
+    return redirect(url_for('admin_login'))
+
 @app.route('/agent')
 def agent():
     """Agent page for managing script access"""
@@ -52,9 +77,8 @@ def agent_login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        # In a real application, you would hash and check passwords against a database
-        # For this example, we'll use a simple hardcoded check
-        if username == 'clipyway@tele.com' and password == '1322CLIPYWAY':
+        # Use secure credentials from environment variables
+        if username == AGENT_USERNAME and password == AGENT_PASSWORD:
             session['agent_authenticated'] = True
             return redirect(url_for('agent'))
         else:
@@ -71,6 +95,10 @@ def agent_logout():
 @app.route('/api/validate-username', methods=['POST'])
 def validate_username():
     """Validate TradingView username"""
+    # Check if user is authenticated (admin or agent)
+    if not (session.get('admin_authenticated') or session.get('agent_authenticated')):
+        return jsonify({"success": False, "error": "Authentication required"})
+    
     try:
         data = request.get_json()
         username = data.get('username', '').strip()
@@ -93,6 +121,10 @@ def validate_username():
 @app.route('/api/grant-access', methods=['POST'])
 def grant_access():
     """Grant access to selected Pine Scripts"""
+    # Check if user is authenticated (admin or agent)
+    if not (session.get('admin_authenticated') or session.get('agent_authenticated')):
+        return jsonify({"success": False, "error": "Authentication required"})
+    
     try:
         data = request.get_json()
         username = data.get('username', '').strip()
@@ -215,6 +247,10 @@ def get_script_users(script_id):
 @app.route('/api/add-script', methods=['POST'])
 def add_script():
     """Add a new Pine Script"""
+    # Admin only operation
+    if not session.get('admin_authenticated'):
+        return jsonify({"success": False, "error": "Admin authentication required"})
+    
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
@@ -238,6 +274,10 @@ def add_script():
 @app.route('/api/remove-script', methods=['POST'])
 def remove_script():
     """Remove a Pine Script"""
+    # Admin only operation
+    if not session.get('admin_authenticated'):
+        return jsonify({"success": False, "error": "Admin authentication required"})
+    
     try:
         data = request.get_json()
         script_id = data.get('script_id')
@@ -331,6 +371,10 @@ def get_scripts():
 @app.route('/api/toggle-agent-visibility', methods=['POST'])
 def toggle_agent_visibility():
     """Toggle agent visibility for a Pine Script"""
+    # Admin only operation
+    if not session.get('admin_authenticated'):
+        return jsonify({"success": False, "error": "Admin authentication required"})
+    
     try:
         data = request.get_json()
         script_id = data.get('script_id')
@@ -441,16 +485,22 @@ def export_script_users(script_id):
 @app.route('/admin')
 def admin_redirect():
     """Redirect admin to main dashboard"""
+    if not session.get('admin_authenticated'):
+        return redirect(url_for('admin_login'))
     return redirect(url_for('index'))
 
 @app.route('/access')
 def access_redirect():
     """Redirect access to main dashboard"""
+    if not session.get('admin_authenticated'):
+        return redirect(url_for('admin_login'))
     return redirect(url_for('index'))
 
 @app.route('/manage')
 def manage_redirect():
     """Redirect old manage route to main dashboard"""
+    if not session.get('admin_authenticated'):
+        return redirect(url_for('admin_login'))
     return redirect(url_for('index'))
 
 # Error handlers
