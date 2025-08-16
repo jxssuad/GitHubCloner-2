@@ -35,6 +35,39 @@ def index():
                          total_scripts=total_scripts,
                          total_access=total_access)
 
+@app.route('/agent')
+def agent():
+    """Agent page for managing script access"""
+    if not session.get('agent_authenticated'):
+        return redirect(url_for('agent_login'))
+
+    # Get all scripts for display
+    scripts = PineScript.get_all()
+    scripts.sort(key=lambda x: x.created_at, reverse=True)
+
+    return render_template('agent.html', scripts=scripts)
+
+@app.route('/agent_login', methods=['GET', 'POST'])
+def agent_login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        # In a real application, you would hash and check passwords against a database
+        # For this example, we'll use a simple hardcoded check
+        if username == 'agent' and password == 'password123':
+            session['agent_authenticated'] = True
+            return redirect(url_for('agent'))
+        else:
+            return render_template('agent_login.html', error='Invalid credentials')
+    return render_template('agent_login.html')
+
+@app.route('/agent_logout')
+def agent_logout():
+    session.pop('agent_authenticated', None)
+    return redirect(url_for('agent_login'))
+
+# ===== API ROUTES =====
+
 @app.route('/api/validate-username', methods=['POST'])
 def validate_username():
     """Validate TradingView username"""
@@ -275,7 +308,7 @@ def export_script_users(script_id):
     try:
         # Get users from TradingView API
         users = tv_api.get_script_users(script_id)
-        
+
         script = PineScript.get(script_id)
         script_name = script.name if script else script_id
 
@@ -293,24 +326,24 @@ def export_script_users(script_id):
         text_content += f"Script ID: {script_id}\n"
         text_content += f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         text_content += "=" * 50 + "\n\n"
-        
+
         for i, user in enumerate(users, 1):
             username = user.get('username', 'Unknown')
             access_type = 'Lifetime' if user.get('has_lifetime_access', False) else 'Temporary'
             expiration = user.get('expiration')
             created = user.get('created')
-            
+
             text_content += f"{i}. {username}\n"
             text_content += f"   Access Type: {access_type}\n"
-            
+
             if expiration:
                 text_content += f"   Expires: {expiration}\n"
             else:
                 text_content += f"   Expires: Never\n"
-                
+
             if created:
                 text_content += f"   Created: {created}\n"
-            
+
             text_content += "\n"
 
         text_content += f"\nTotal Users: {len(users)}\n"

@@ -1,0 +1,338 @@
+
+{% extends "base.html" %}
+
+{% block title %}Agent - TradingView Access{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-center flex-grow-1">
+                        <h2><i class="fas fa-user-tie me-2"></i>Agent Access Panel</h2>
+                        <p class="mb-0">Manage TradingView Script Access for Users</p>
+                    </div>
+                    <a href="/agent_logout" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Step 1: Username Entry -->
+                <div id="username-section">
+                    <h4><i class="fas fa-user me-2"></i>Step 1: Enter TradingView Username</h4>
+                    <form id="username-form" class="mb-4">
+                        <div class="input-group input-group-lg">
+                            <input type="text" class="form-control" id="username" placeholder="Enter TradingView username" required>
+                            <button class="btn btn-outline-secondary" type="button" id="validate-btn">
+                                <i class="fas fa-check me-1"></i>Validate
+                            </button>
+                        </div>
+                        <div id="username-validation" class="form-text mt-2"></div>
+                    </form>
+                </div>
+
+                <!-- Step 2: Script Selection (Hidden initially) -->
+                <div id="script-section" class="d-none">
+                    <h4><i class="fas fa-code me-2"></i>Step 2: Select Scripts</h4>
+                    <p class="text-muted">Username: <strong><span id="validated-username"></span></strong></p>
+                    
+                    <div class="script-selection mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <label class="form-label mb-0">Available Scripts:</label>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="select-all-btn">
+                                <i class="fas fa-check-double me-1"></i>Select All
+                            </button>
+                        </div>
+                        
+                        <div id="scripts-list" class="row">
+                            {% for script in scripts %}
+                            <div class="col-md-6 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input script-checkbox" type="checkbox" 
+                                           value="{{ script.pine_id }}" id="script-{{ loop.index }}">
+                                    <label class="form-check-label" for="script-{{ loop.index }}">
+                                        <strong>{{ script.name }}</strong>
+                                        {% if script.description %}
+                                        <br><small class="text-muted">{{ script.description }}</small>
+                                        {% endif %}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if not scripts %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-info-circle fa-2x mb-2"></i>
+                            <p class="mb-0">No scripts available at the moment.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Access Duration -->
+                    <div class="mb-4">
+                        <label for="duration" class="form-label">Access Duration</label>
+                        <select class="form-select" id="duration">
+                            <option value="1L">Lifetime Access</option>
+                            <option value="7D">7 Days</option>
+                            <option value="30D">30 Days</option>
+                            <option value="90D">90 Days</option>
+                        </select>
+                    </div>
+
+                    <!-- Generate Access Button -->
+                    <div class="d-grid">
+                        <button type="button" class="btn btn-success btn-lg" id="generate-access-btn">
+                            <i class="fas fa-key me-2"></i>Generate Access
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="text-center d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Processing request...</p>
+                </div>
+
+                <!-- Results Section -->
+                <div id="results-section" class="d-none">
+                    <h4><i class="fas fa-check-circle me-2"></i>Access Generated</h4>
+                    <div id="results-content"></div>
+                    <button type="button" class="btn btn-primary mt-3" onclick="resetForm()">
+                        <i class="fas fa-plus me-1"></i>Generate More Access
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Scripts Display -->
+        <div class="card shadow mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-list me-2"></i>Available Scripts ({{ scripts|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if scripts %}
+                <div class="row">
+                    {% for script in scripts %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ script.name }}</h6>
+                                {% if script.description %}
+                                <p class="card-text text-muted small">{{ script.description }}</p>
+                                {% endif %}
+                                <small class="text-muted">
+                                    <i class="fas fa-clock me-1"></i>
+                                    Added: {{ script.created_at.strftime('%Y-%m-%d') }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-info-circle fa-2x mb-2"></i>
+                    <p class="mb-0">No scripts available. Contact admin to add scripts.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentUsername = '';
+let allSelected = false;
+
+// Username validation
+document.getElementById('validate-btn').addEventListener('click', function() {
+    const username = document.getElementById('username').value.trim();
+    const validationDiv = document.getElementById('username-validation');
+    
+    if (!username) {
+        showValidationError('Please enter a username');
+        return;
+    }
+    
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Validating...';
+    btn.disabled = true;
+    
+    fetch('/api/validate-username', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: username})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentUsername = data.verified_name || username;
+            showValidationSuccess(`Username validated: ${currentUsername}`);
+            showScriptSection();
+        } else {
+            showValidationError(data.error || 'Username validation failed');
+        }
+    })
+    .catch(error => {
+        console.error('Validation error:', error);
+        showValidationError('Error validating username. Please try again.');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+});
+
+// Script selection toggle
+document.getElementById('select-all-btn').addEventListener('click', function() {
+    const checkboxes = document.querySelectorAll('.script-checkbox');
+    allSelected = !allSelected;
+    
+    checkboxes.forEach(cb => {
+        cb.checked = allSelected;
+    });
+    
+    this.innerHTML = allSelected 
+        ? '<i class="fas fa-square me-1"></i>Deselect All'
+        : '<i class="fas fa-check-double me-1"></i>Select All';
+});
+
+// Generate access
+document.getElementById('generate-access-btn').addEventListener('click', function() {
+    const selectedScripts = Array.from(document.querySelectorAll('.script-checkbox:checked')).map(cb => cb.value);
+    const duration = document.getElementById('duration').value;
+    
+    if (selectedScripts.length === 0) {
+        alert('Please select at least one script');
+        return;
+    }
+    
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating Access...';
+    btn.disabled = true;
+    
+    showLoading(true);
+    
+    fetch('/api/grant-access', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            username: currentUsername,
+            scripts: selectedScripts,
+            duration: duration
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        showLoading(false);
+        displayResults(data);
+    })
+    .catch(error => {
+        showLoading(false);
+        console.error('Access generation error:', error);
+        alert('Error generating access. Please try again.');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+});
+
+function showValidationError(message) {
+    const validationDiv = document.getElementById('username-validation');
+    validationDiv.innerHTML = `<span class="text-danger"><i class="fas fa-times me-1"></i>${message}</span>`;
+}
+
+function showValidationSuccess(message) {
+    const validationDiv = document.getElementById('username-validation');
+    validationDiv.innerHTML = `<span class="text-success"><i class="fas fa-check me-1"></i>${message}</span>`;
+}
+
+function showScriptSection() {
+    document.getElementById('username-section').classList.add('d-none');
+    document.getElementById('script-section').classList.remove('d-none');
+    document.getElementById('validated-username').textContent = currentUsername;
+}
+
+function showLoading(show) {
+    const loadingDiv = document.getElementById('loading');
+    if (show) {
+        loadingDiv.classList.remove('d-none');
+    } else {
+        loadingDiv.classList.add('d-none');
+    }
+}
+
+function displayResults(data) {
+    const resultsSection = document.getElementById('results-section');
+    const resultsContent = document.getElementById('results-content');
+    
+    let html = `<div class="alert alert-info">
+        <strong>Access generation completed for: ${currentUsername}</strong>
+    </div>`;
+    
+    if (data.results && data.results.length > 0) {
+        html += `<div class="alert alert-success">
+            <h6><i class="fas fa-check-circle me-2"></i>Successfully granted access to:</h6>
+            <ul class="mb-0">`;
+        
+        data.results.forEach(result => {
+            html += `<li>${result.script_name} (${result.duration === '1L' ? 'Lifetime' : result.duration})</li>`;
+        });
+        
+        html += `</ul></div>`;
+    }
+    
+    if (data.errors && data.errors.length > 0) {
+        html += `<div class="alert alert-warning">
+            <h6><i class="fas fa-exclamation-triangle me-2"></i>Failed to grant access to:</h6>
+            <ul class="mb-0">`;
+        
+        data.errors.forEach(error => {
+            html += `<li>${error.script_name}: ${error.error}</li>`;
+        });
+        
+        html += `</ul></div>`;
+    }
+    
+    resultsContent.innerHTML = html;
+    
+    // Hide script section and show results
+    document.getElementById('script-section').classList.add('d-none');
+    resultsSection.classList.remove('d-none');
+}
+
+function resetForm() {
+    // Reset form state
+    currentUsername = '';
+    allSelected = false;
+    
+    // Reset UI
+    document.getElementById('username').value = '';
+    document.getElementById('username-validation').innerHTML = '';
+    document.querySelectorAll('.script-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('select-all-btn').innerHTML = '<i class="fas fa-check-double me-1"></i>Select All';
+    document.getElementById('duration').value = '1L';
+    
+    // Show/hide sections
+    document.getElementById('username-section').classList.remove('d-none');
+    document.getElementById('script-section').classList.add('d-none');
+    document.getElementById('results-section').classList.add('d-none');
+}
+
+// Allow Enter key to validate username
+document.getElementById('username').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('validate-btn').click();
+    }
+});
+</script>
+{% endblock %}
