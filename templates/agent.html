@@ -111,35 +111,45 @@
 
         <!-- Real-time Scripts Display -->
         <div class="card shadow mt-4">
-            <div class="card-header">
-                <h5><i class="fas fa-list me-2"></i>Available Scripts ({{ scripts|length }})</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list me-2"></i>Available Scripts (<span id="scripts-count">{{ scripts|length }}</span>)</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshScripts()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                    <span class="badge bg-success ms-2" id="live-indicator">
+                        <i class="fas fa-circle me-1"></i>Live
+                    </span>
+                </div>
             </div>
             <div class="card-body">
-                {% if scripts %}
-                <div class="row">
-                    {% for script in scripts %}
-                    <div class="col-md-6 col-lg-4 mb-3">
-                        <div class="card border-0 bg-light">
-                            <div class="card-body">
-                                <h6 class="card-title">{{ script.name }}</h6>
-                                {% if script.description %}
-                                <p class="card-text text-muted small">{{ script.description }}</p>
-                                {% endif %}
-                                <small class="text-muted">
-                                    <i class="fas fa-clock me-1"></i>
-                                    Added: {{ script.created_at.strftime('%Y-%m-%d') }}
-                                </small>
+                <div id="realtime-scripts-container">
+                    {% if scripts %}
+                    <div class="row">
+                        {% for script in scripts %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ script.name }}</h6>
+                                    {% if script.description %}
+                                    <p class="card-text text-muted small">{{ script.description }}</p>
+                                    {% endif %}
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Added: {{ script.created_at.strftime('%Y-%m-%d') }}
+                                    </small>
+                                </div>
                             </div>
                         </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-info-circle fa-2x mb-2"></i>
+                        <p class="mb-0">No scripts available. Contact admin to add scripts.</p>
+                    </div>
+                    {% endif %}
                 </div>
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="fas fa-info-circle fa-2x mb-2"></i>
-                    <p class="mb-0">No scripts available. Contact admin to add scripts.</p>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -332,6 +342,119 @@ document.getElementById('username').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
         document.getElementById('validate-btn').click();
+    }
+});
+
+// Real-time script updates
+function refreshScripts() {
+    const indicator = document.getElementById('live-indicator');
+    const refreshBtn = document.querySelector('button[onclick="refreshScripts()"]');
+    const originalBtnText = refreshBtn.innerHTML;
+    
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Refreshing...';
+    refreshBtn.disabled = true;
+    indicator.className = 'badge bg-warning ms-2';
+    indicator.innerHTML = '<i class="fas fa-sync fa-spin me-1"></i>Updating...';
+    
+    fetch('/api/get-scripts')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateScriptsDisplay(data.scripts);
+                updateScriptsSelection(data.scripts);
+                document.getElementById('scripts-count').textContent = data.count;
+                
+                indicator.className = 'badge bg-success ms-2';
+                indicator.innerHTML = '<i class="fas fa-check me-1"></i>Updated';
+                
+                setTimeout(() => {
+                    indicator.className = 'badge bg-success ms-2';
+                    indicator.innerHTML = '<i class="fas fa-circle me-1"></i>Live';
+                }, 2000);
+            } else {
+                console.error('Failed to refresh scripts:', data.error);
+                indicator.className = 'badge bg-danger ms-2';
+                indicator.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Error';
+            }
+        })
+        .catch(error => {
+            console.error('Error refreshing scripts:', error);
+            indicator.className = 'badge bg-danger ms-2';
+            indicator.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Error';
+        })
+        .finally(() => {
+            refreshBtn.innerHTML = originalBtnText;
+            refreshBtn.disabled = false;
+        });
+}
+
+function updateScriptsDisplay(scripts) {
+    const container = document.getElementById('realtime-scripts-container');
+    
+    if (scripts.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-info-circle fa-2x mb-2"></i>
+                <p class="mb-0">No scripts available. Contact admin to add scripts.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div class="row">';
+    scripts.forEach((script, index) => {
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card border-0 bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title">${script.name}</h6>
+                        ${script.description ? `<p class="card-text text-muted small">${script.description}</p>` : ''}
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>
+                            Added: ${script.created_at}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+function updateScriptsSelection(scripts) {
+    const scriptsList = document.getElementById('scripts-list');
+    let html = '';
+    
+    scripts.forEach((script, index) => {
+        const isChecked = Array.from(document.querySelectorAll('.script-checkbox:checked'))
+            .some(cb => cb.value === script.pine_id);
+        
+        html += `
+            <div class="col-md-6 mb-2">
+                <div class="form-check">
+                    <input class="form-check-input script-checkbox" type="checkbox" 
+                           value="${script.pine_id}" id="script-${index}" ${isChecked ? 'checked' : ''}>
+                    <label class="form-check-label" for="script-${index}">
+                        <strong>${script.name}</strong>
+                        ${script.description ? `<br><small class="text-muted">${script.description}</small>` : ''}
+                    </label>
+                </div>
+            </div>
+        `;
+    });
+    
+    scriptsList.innerHTML = html;
+}
+
+// Auto-refresh scripts every 30 seconds
+setInterval(refreshScripts, 30000);
+
+// Refresh on page focus (when user returns to tab)
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        setTimeout(refreshScripts, 1000);
     }
 });
 </script>

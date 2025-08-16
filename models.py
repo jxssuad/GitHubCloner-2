@@ -101,6 +101,11 @@ def initialize_default_scripts():
             ("Goatalgo", "PUB;0a056b6e1feb4183abf6e601d4140189"),
             ("xpalgo", "PUB;5e901ec6f78043b4bca09e8c2f911e01"),
             ("NovaAlgo", "PUB;f42a2d8c9ede4bc4b005fb8e56b500cc"),
+            ("PrimeAlgo", "PUB;933c9921bf5845bb844b3e09f371b271"),
+            ("Prime OB", "PUB;19ad042efef94ad681fbc27812a15b92"),
+            ("Prime OSI", "PUB;78ea5893ce664b64b15aa737eba353f9"),
+            ("SMRTAlgo", "PUB;cd52ab53c0154f3da9f66de7d1709f29"),
+            ("PRO V6", "PUB;cd88bb06edd74f0d9af1958980d63aad"),
         ]
 
         for name, pine_id in default_scripts:

@@ -302,6 +302,31 @@ def bulk_remove_access():
         logger.error(f"Error bulk removing access: {e}")
         return jsonify({"success": False, "error": str(e)})
 
+@app.route('/api/get-scripts')
+def get_scripts():
+    """Get all available scripts for real-time updates"""
+    try:
+        scripts = PineScript.get_all()
+        scripts.sort(key=lambda x: x.created_at, reverse=True)
+        
+        scripts_data = []
+        for script in scripts:
+            scripts_data.append({
+                'pine_id': script.pine_id,
+                'name': script.name,
+                'description': script.description or '',
+                'created_at': script.created_at.strftime('%Y-%m-%d')
+            })
+        
+        return jsonify({
+            "success": True,
+            "scripts": scripts_data,
+            "count": len(scripts_data)
+        })
+    except Exception as e:
+        logger.error(f"Error getting scripts: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route('/api/export-script-users/<script_id>')
 def export_script_users(script_id):
     """Export all usernames that have access to a specific Pine Script as text file"""
