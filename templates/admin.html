@@ -125,63 +125,34 @@
                     <h5><i class="fas fa-script me-2"></i>Script Management</h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">Pine Scripts Management</h5>
-                        <div>
-                            <button class="btn btn-outline-primary me-2" onclick="scrapeAllScriptsUsers()">
-                                <i class="fas fa-sync"></i> Scrape All Scripts
-                            </button>
-                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addScriptModal">
-                                <i class="fas fa-plus"></i> Add Script
-                            </button>
-                        </div>
-                    </div>
+                    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addScriptModal">
+                        <i class="fas fa-plus me-2"></i>Add Script
+                    </button>
 
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Script ID</th>
-                                    <th>Description</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for script in scripts %}
-                                <tr>
-                                    <td>{{ script.name }}</td>
-                                    <td><code>{{ script.pine_id }}</code></td>
-                                    <td>{{ script.description or '-' }}</td>
-                                    <td>
-                                        <span class="badge bg-success">Active</span>
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-sm btn-info me-1" onclick="viewScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
-                                            <i class="fas fa-users"></i> View Users
-                                        </button>
-                                        <button class="btn btn-sm btn-primary me-1" onclick="scrapeScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
-                                            <i class="fas fa-sync"></i> Scrape Users
-                                        </button>
-                                        <button class="btn btn-sm btn-warning me-1" onclick="exportScriptUsers('{{ script.pine_id }}', '{{ script.name }}')">
-                                            <i class="fas fa-download"></i> Export
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" onclick="removeScript('{{ script.pine_id }}', '{{ script.name }}')">
-                                            <i class="fas fa-trash"></i> Remove
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="list-group" style="max-height: 400px; overflow-y: auto;">
+                        {% for script in scripts %}
+                        <div class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1 me-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <strong class="text-primary">{{ script.name }}</strong>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="removeScript('{{ script.pine_id }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block font-monospace">{{ script.pine_id }}</small>
+                                {% if script.description %}
+                                <small class="text-info d-block mt-1">{{ script.description }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not scripts %}
+                        <div class="list-group-item text-center text-muted">
+                            <i class="fas fa-code fa-2x mb-2"></i>
+                            <p class="mb-0">No scripts added yet</p>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% if not scripts %}
-                    <div class="list-group-item text-center text-muted">
-                        <i class="fas fa-code fa-2x mb-2"></i>
-                        <p class="mb-0">No scripts added yet</p>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -256,21 +227,13 @@
                         <input type="text" class="form-control" id="scriptName" required>
                     </div>
                     <div class="mb-3">
-                        <label for="scriptId" class="form-label">Pine Script ID</label>
-                        <input type="text" class="form-control" id="scriptId" placeholder="PUB;xxxxxxxxxx" required>
+                        <label for="scriptId" class="form-label">Script ID</label>
+                        <input type="text" class="form-control" id="scriptId" placeholder="PUB;xxxxxxx..." required>
+                        <div class="form-text">Pine Script publication ID (e.g., PUB;abc123...)</div>
                     </div>
                     <div class="mb-3">
-                        <label for="scriptDescription" class="form-label">Description (Optional)</label>
-                        <textarea class="form-control" id="scriptDescription" rows="3"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="scrapeUsers" checked>
-                            <label class="form-check-label" for="scrapeUsers">
-                                <i class="fas fa-users me-1"></i>Automatically scrape existing users
-                            </label>
-                            <div class="form-text">This will fetch all users who currently have access to this script</div>
-                        </div>
+                        <label for="scriptDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="scriptDescription" rows="2"></textarea>
                     </div>
                 </form>
             </div>
@@ -326,7 +289,7 @@ function fixModalBackdrop() {
     // Remove any lingering modal backdrops
     const backdrops = document.querySelectorAll('.modal-backdrop');
     backdrops.forEach(backdrop => backdrop.remove());
-
+    
     // Remove modal-open class from body
     document.body.classList.remove('modal-open');
     document.body.style.overflow = '';
@@ -437,11 +400,11 @@ document.getElementById('accessForm').addEventListener('submit', function(e) {
 function toggleSelectAll() {
     const checkboxes = document.querySelectorAll('.script-checkbox');
     const btn = event.target.closest('button');
-
+    
     // Check current state based on actual checkboxes
     const checkedCount = document.querySelectorAll('.script-checkbox:checked').length;
     const shouldSelectAll = checkedCount === 0;
-
+    
     checkboxes.forEach(cb => {
         cb.checked = shouldSelectAll;
     });
@@ -450,7 +413,7 @@ function toggleSelectAll() {
     btn.innerHTML = shouldSelectAll 
         ? '<i class="fas fa-square me-1"></i>Deselect All'
         : '<i class="fas fa-check-square me-1"></i>Select All';
-
+        
     allSelected = shouldSelectAll;
 }
 
@@ -530,7 +493,7 @@ function toggleSelectAllUsers() {
     const checkboxes = document.querySelectorAll('.user-checkbox');
     const selectAllCheckbox = document.getElementById('selectAllUsers');
     const btn = document.getElementById('selectAllUsersBtn');
-
+    
     // Check current state based on actual checkboxes
     const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
     const shouldSelectAll = checkedCount === 0;
@@ -547,7 +510,7 @@ function toggleSelectAllUsers() {
     btn.innerHTML = shouldSelectAll 
         ? '<i class="fas fa-square me-1"></i>Deselect All'
         : '<i class="fas fa-check-square me-1"></i>Select All';
-
+        
     allUsersSelected = shouldSelectAll;
 }
 
@@ -599,7 +562,7 @@ function toggleSelectAllUsersFromCheckbox() {
     const checkboxes = document.querySelectorAll('.user-checkbox');
     const selectAllCheckbox = document.getElementById('selectAllUsers');
     const btn = document.getElementById('selectAllUsersBtn');
-
+    
     const shouldSelectAll = selectAllCheckbox.checked;
 
     checkboxes.forEach(cb => {
@@ -612,7 +575,7 @@ function toggleSelectAllUsersFromCheckbox() {
             ? '<i class="fas fa-square me-1"></i>Deselect All'
             : '<i class="fas fa-check-square me-1"></i>Select All';
     }
-
+        
     allUsersSelected = shouldSelectAll;
 }
 
@@ -641,106 +604,32 @@ function removeSingleUser(username) {
 }
 
 function addScript() {
-    const form = document.getElementById('addScriptForm');
-    const formData = new FormData(form);
+    const name = document.getElementById('scriptName').value.trim();
+    const scriptId = document.getElementById('scriptId').value.trim();
+    const description = document.getElementById('scriptDescription').value.trim();
 
-    const data = {
-        name: document.getElementById('scriptName').value.trim(),
-        script_id: document.getElementById('scriptId').value.trim(),
-        description: document.getElementById('scriptDescription').value.trim(),
-        scrape_users: document.getElementById('scrapeUsers').checked
-    };
-
-    if (!data.name || !data.script_id) {
-        showAlert('Please fill in all required fields', 'danger');
+    if (!name || !scriptId) {
+        alert('Please fill in required fields');
         return;
     }
 
     fetch('/api/add-script', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, script_id: scriptId, description: description})
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            let message = data.message || 'Script added successfully!';
-            if (data.user_data) {
-                message += ` Found ${data.user_data.total_users} existing users (${data.user_data.lifetime_users} lifetime, ${data.user_data.temporary_users} temporary).`;
-            }
-            showAlert(message, 'success');
-            form.reset();
-            setTimeout(() => location.reload(), 2000);
+            location.reload();
         } else {
-            showAlert(data.error, 'danger');
+            alert(data.error);
         }
-    })
-    .catch(error => {
-        showAlert('Error adding script', 'danger');
-        console.error('Error:', error);
     });
 }
 
-function scrapeScriptUsers(scriptId, scriptName) {
-    if (!confirm(`Scrape all users from "${scriptName}"? This will fetch the latest user list from TradingView.`)) {
-        return;
-    }
-
-    showAlert('Scraping users...', 'info');
-
-    fetch(`/api/scrape-script-users/${scriptId}`, {
-        method: 'POST'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const userData = data.user_data;
-            showAlert(`Successfully scraped ${userData.total_users} users from "${scriptName}" (${userData.lifetime_users} lifetime, ${userData.temporary_users} temporary)`, 'success');
-
-            // Optionally refresh the view users modal if it's open
-            const modal = document.getElementById('scriptUsersModal');
-            if (modal && modal.classList.contains('show')) {
-                viewScriptUsers(scriptId, scriptName);
-            }
-        } else {
-            showAlert(`Error scraping users: ${data.error}`, 'danger');
-        }
-    })
-    .catch(error => {
-        showAlert('Error scraping users', 'danger');
-        console.error('Error:', error);
-    });
-}
-
-function scrapeAllScriptsUsers() {
-    if (!confirm('Scrape users from ALL active scripts? This may take some time.')) {
-        return;
-    }
-
-    showAlert('Scraping users from all scripts...', 'info');
-
-    fetch('/api/scrape-all-scripts-users', {
-        method: 'POST'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const summary = data.summary;
-            showAlert(`Successfully scraped users from ${summary.scripts_processed} scripts. Total users found: ${summary.total_users_found}`, 'success');
-        } else {
-            showAlert(`Error scraping users: ${data.error}`, 'danger');
-        }
-    })
-    .catch(error => {
-        showAlert('Error scraping users from all scripts', 'danger');
-        console.error('Error:', error);
-    });
-}
-
-function removeScript(scriptId, scriptName) {
-    if (!confirm(`Are you sure you want to remove "${scriptName}"?`)) return;
+function removeScript(scriptId) {
+    if (!confirm('Are you sure you want to remove this script?')) return;
 
     fetch('/api/remove-script', {
         method: 'POST',
@@ -798,7 +687,7 @@ document.addEventListener('DOMContentLoaded', function() {
             fixModalBackdrop();
         });
     }
-
+    
     const addScriptModal = document.getElementById('addScriptModal');
     if (addScriptModal) {
         addScriptModal.addEventListener('hidden.bs.modal', function () {
