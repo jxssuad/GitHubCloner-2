@@ -1,14 +1,26 @@
-from flask import render_template, request, jsonify, session, redirect, url_for
-from app import app
-from models import AccessLog, PineScript, initialize_default_scripts
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from models import PineScript, AccessLog, initialize_default_scripts
 from tradingview import TradingViewAPI
 from datetime import datetime
 import logging
+import os
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'a_very_secret_key_for_development')
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 # Initialize TradingView API
 tv_api = TradingViewAPI()
+
+# --- Authentication Keys ---
+AGENT_KEY = "AGENTPRO1322"
+ADMIN_KEY = "CLIPYWAY1322"
 
 # ===== MAIN ROUTES =====
 
@@ -34,6 +46,62 @@ def index():
                          access_logs=access_logs[:20],  # Show last 20 logs
                          total_scripts=total_scripts,
                          total_access=total_access)
+
+# --- Agent Page Routes ---
+
+@app.route('/agent')
+def agent_dashboard():
+    """Agent dashboard - generate access"""
+    if not session.get('agent_authenticated'):
+        return redirect(url_for('agent_login'))
+    return render_template('agent.html')
+
+@app.route('/agent/login', methods=['GET', 'POST'])
+def agent_login():
+    """Login for agent page"""
+    if request.method == 'POST':
+        key = request.form.get('key')
+        if key == AGENT_KEY:
+            session['agent_authenticated'] = True
+            return redirect(url_for('agent_dashboard'))
+        else:
+            return render_template('agent_login.html', error="Invalid Agent Key")
+    return render_template('agent_login.html')
+
+@app.route('/agent/logout')
+def agent_logout():
+    """Logout from agent page"""
+    session.pop('agent_authenticated', None)
+    return redirect(url_for('agent_login'))
+
+# --- Admin Page Authentication ---
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    """Login for admin page"""
+    if request.method == 'POST':
+        key = request.form.get('key')
+        if key == ADMIN_KEY:
+            session['admin_authenticated'] = True
+            return redirect(url_for('index')) # Redirect to the main admin dashboard
+        else:
+            return render_template('admin_login.html', error="Invalid Admin Key")
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    """Logout from admin page"""
+    session.pop('admin_authenticated', None)
+    return redirect(url_for('admin_login'))
+
+# Middleware to protect admin routes
+@app.before_request
+def protect_admin_routes():
+    if request.path.startswith('/admin') and request.path != '/admin/login' and request.path != '/admin/logout':
+        if not session.get('admin_authenticated'):
+            return redirect(url_for('admin_login'))
+
+
+# ===== API ROUTES =====
 
 @app.route('/api/validate-username', methods=['POST'])
 def validate_username():
@@ -275,7 +343,7 @@ def export_script_users(script_id):
     try:
         # Get users from TradingView API
         users = tv_api.get_script_users(script_id)
-        
+
         script = PineScript.get(script_id)
         script_name = script.name if script else script_id
 
@@ -293,24 +361,24 @@ def export_script_users(script_id):
         text_content += f"Script ID: {script_id}\n"
         text_content += f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         text_content += "=" * 50 + "\n\n"
-        
+
         for i, user in enumerate(users, 1):
             username = user.get('username', 'Unknown')
             access_type = 'Lifetime' if user.get('has_lifetime_access', False) else 'Temporary'
             expiration = user.get('expiration')
             created = user.get('created')
-            
+
             text_content += f"{i}. {username}\n"
             text_content += f"   Access Type: {access_type}\n"
-            
+
             if expiration:
                 text_content += f"   Expires: {expiration}\n"
             else:
                 text_content += f"   Expires: Never\n"
-                
+
             if created:
                 text_content += f"   Created: {created}\n"
-            
+
             text_content += "\n"
 
         text_content += f"\nTotal Users: {len(users)}\n"
@@ -330,6 +398,74 @@ def export_script_users(script_id):
             mimetype='text/plain',
             headers={"Content-disposition": f"attachment; filename=export_error.txt"}
         )
+
+# ===== API ENDPOINTS FOR AGENT PAGE =====
+
+@app.route('/api/agent/scripts', methods=['GET'])
+def get_agent_scripts():
+    """Get all available scripts for the agent"""
+    if not session.get('agent_authenticated'):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    try:
+        scripts = PineScript.get_all()
+        scripts_data = []
+
+        for script in scripts:
+            scripts_data.append({
+                'pine_id': script.pine_id,
+                'name': script.name,
+                'description': script.description
+            })
+
+        return jsonify({"success": True, "scripts": scripts_data})
+    except Exception as e:
+        logger.error(f"Error getting scripts for agent: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/agent/grant-access', methods=['POST'])
+def agent_grant_access():
+    """Grant access to selected Pine Scripts for the agent"""
+    if not session.get('agent_authenticated'):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        selected_script_id = data.get('script_id') # Agent selects one script at a time
+
+        if not username:
+            return jsonify({"success": False, "error": "Username is required"})
+        if not selected_script_id:
+            return jsonify({"success": False, "error": "Please select a script"})
+
+        script = PineScript.get(selected_script_id)
+        if not script:
+            return jsonify({"success": False, "error": "Script not found"})
+
+        # Grant access via TradingView API (default to lifetime for agent)
+        result = tv_api.add_pine_permission(username, selected_script_id)
+        success = result.get('success', False)
+        status = "success" if success else "failure"
+        script_name = script.name
+
+        # Log the operation
+        AccessLog.create(
+            username=username,
+            pine_id=selected_script_id,
+            pine_script_name=script_name,
+            operation="grant_agent",
+            status=status,
+            details=f"Agent grant - {result.get('message', '')}"
+        )
+
+        return jsonify({
+            "success": success,
+            "message": result.get('message', 'Access granted successfully') if success else result.get('message', 'Failed to grant access')
+        })
+
+    except Exception as e:
+        logger.error(f"Error granting access for agent: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
 
 # ===== REDIRECT ROUTES =====
 
@@ -356,3 +492,9 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return "<h1>500 - Internal Server Error</h1>", 500
+
+if __name__ == '__main__':
+    # Ensure default scripts are initialized when the app starts
+    initialize_default_scripts()
+    # Use a more robust secret key in production
+    app.run(debug=True)
