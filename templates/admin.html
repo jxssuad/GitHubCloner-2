@@ -291,7 +291,7 @@ function fixModalBackdrop() {
     // Remove any lingering modal backdrops
     const backdrops = document.querySelectorAll('.modal-backdrop');
     backdrops.forEach(backdrop => backdrop.remove());
-    
+
     // Remove modal-open class from body
     document.body.classList.remove('modal-open');
     document.body.style.overflow = '';
@@ -402,20 +402,20 @@ document.getElementById('accessForm').addEventListener('submit', function(e) {
 function toggleSelectAll() {
     const checkboxes = document.querySelectorAll('.script-checkbox');
     const btn = event.target.closest('button');
-    
+
     // Check current state based on actual checkboxes
     const checkedCount = document.querySelectorAll('.script-checkbox:checked').length;
     const shouldSelectAll = checkedCount === 0;
-    
+
     checkboxes.forEach(cb => {
         cb.checked = shouldSelectAll;
     });
 
     // Update button text based on new state
-    btn.innerHTML = shouldSelectAll 
+    btn.innerHTML = shouldSelectAll
         ? '<i class="fas fa-square me-1"></i>Deselect All'
         : '<i class="fas fa-check-square me-1"></i>Select All';
-        
+
     allSelected = shouldSelectAll;
 }
 
@@ -495,7 +495,7 @@ function toggleSelectAllUsers() {
     const checkboxes = document.querySelectorAll('.user-checkbox');
     const selectAllCheckbox = document.getElementById('selectAllUsers');
     const btn = document.getElementById('selectAllUsersBtn');
-    
+
     // Check current state based on actual checkboxes
     const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
     const shouldSelectAll = checkedCount === 0;
@@ -509,10 +509,12 @@ function toggleSelectAllUsers() {
     }
 
     // Update button text based on new state
-    btn.innerHTML = shouldSelectAll 
-        ? '<i class="fas fa-square me-1"></i>Deselect All'
-        : '<i class="fas fa-check-square me-1"></i>Select All';
-        
+    if (btn) {
+        btn.innerHTML = shouldSelectAll
+            ? '<i class="fas fa-square me-1"></i>Deselect All'
+            : '<i class="fas fa-check-square me-1"></i>Select All';
+    }
+
     allUsersSelected = shouldSelectAll;
 }
 
@@ -564,7 +566,7 @@ function toggleSelectAllUsersFromCheckbox() {
     const checkboxes = document.querySelectorAll('.user-checkbox');
     const selectAllCheckbox = document.getElementById('selectAllUsers');
     const btn = document.getElementById('selectAllUsersBtn');
-    
+
     const shouldSelectAll = selectAllCheckbox.checked;
 
     checkboxes.forEach(cb => {
@@ -573,11 +575,11 @@ function toggleSelectAllUsersFromCheckbox() {
 
     // Update button text based on checkbox state
     if (btn) {
-        btn.innerHTML = shouldSelectAll 
+        btn.innerHTML = shouldSelectAll
             ? '<i class="fas fa-square me-1"></i>Deselect All'
             : '<i class="fas fa-check-square me-1"></i>Select All';
     }
-        
+
     allUsersSelected = shouldSelectAll;
 }
 
@@ -631,7 +633,9 @@ function addScript() {
 }
 
 function removeScript(scriptId) {
-    if (!confirm('Are you sure you want to remove this script?')) return;
+    if (!confirm('Are you sure you want to remove this script?')) {
+        return;
+    }
 
     fetch('/api/remove-script', {
         method: 'POST',
@@ -643,7 +647,7 @@ function removeScript(scriptId) {
         if (data.success) {
             location.reload();
         } else {
-            alert(data.error);
+            alert('Error removing script: ' + data.error);
         }
     });
 }
@@ -681,6 +685,42 @@ function exportScriptUsers(scriptId, scriptName) {
     });
 }
 
+function toggleAgentVisibility(scriptId, checkbox) {
+    const originalState = checkbox.checked;
+
+    fetch('/api/toggle-agent-visibility', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({script_id: scriptId})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            checkbox.checked = data.is_visible_to_agent;
+
+            // Show feedback
+            const label = checkbox.nextElementSibling;
+            const originalText = label.textContent;
+            label.textContent = data.is_visible_to_agent ? 'Agent Access ✓' : 'Agent Access ✗';
+            label.className = data.is_visible_to_agent ? 'form-check-label small text-success' : 'form-check-label small text-muted';
+
+            setTimeout(() => {
+                label.textContent = originalText;
+                label.className = 'form-check-label small';
+            }, 2000);
+        } else {
+            // Revert checkbox state on error
+            checkbox.checked = !originalState;
+            alert('Error updating agent visibility: ' + data.error);
+        }
+    })
+    .catch(error => {
+        // Revert checkbox state on error
+        checkbox.checked = !originalState;
+        alert('Error updating agent visibility: ' + error.message);
+    });
+}
+
 // Fix modal backdrop issues when modals are closed
 document.addEventListener('DOMContentLoaded', function() {
     const scriptUsersModal = document.getElementById('scriptUsersModal');
@@ -689,7 +729,7 @@ document.addEventListener('DOMContentLoaded', function() {
             fixModalBackdrop();
         });
     }
-    
+
     const addScriptModal = document.getElementById('addScriptModal');
     if (addScriptModal) {
         addScriptModal.addEventListener('hidden.bs.modal', function () {

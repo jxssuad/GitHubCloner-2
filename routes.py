@@ -41,8 +41,8 @@ def agent():
     if not session.get('agent_authenticated'):
         return redirect(url_for('agent_login'))
 
-    # Get all scripts for display
-    scripts = PineScript.get_all()
+    # Get only agent-visible scripts for display
+    scripts = PineScript.get_agent_visible()
     scripts.sort(key=lambda x: x.created_at, reverse=True)
 
     return render_template('agent.html', scripts=scripts)
@@ -315,7 +315,8 @@ def get_scripts():
                 'pine_id': script.pine_id,
                 'name': script.name,
                 'description': script.description or '',
-                'created_at': script.created_at.strftime('%Y-%m-%d')
+                'created_at': script.created_at.strftime('%Y-%m-%d'),
+                'is_visible_to_agent': script.is_visible_to_agent
             })
         
         return jsonify({
@@ -325,6 +326,52 @@ def get_scripts():
         })
     except Exception as e:
         logger.error(f"Error getting scripts: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/toggle-agent-visibility', methods=['POST'])
+def toggle_agent_visibility():
+    """Toggle agent visibility for a Pine Script"""
+    try:
+        data = request.get_json()
+        script_id = data.get('script_id')
+        
+        script = PineScript.get(script_id)
+        if not script:
+            return jsonify({"success": False, "error": "Script not found"})
+        
+        script.is_visible_to_agent = not script.is_visible_to_agent
+        
+        return jsonify({
+            "success": True,
+            "is_visible_to_agent": script.is_visible_to_agent
+        })
+    except Exception as e:
+        logger.error(f"Error toggling agent visibility: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/get-agent-scripts')
+def get_agent_scripts():
+    """Get scripts visible to agents for real-time updates"""
+    try:
+        scripts = PineScript.get_agent_visible()
+        scripts.sort(key=lambda x: x.created_at, reverse=True)
+        
+        scripts_data = []
+        for script in scripts:
+            scripts_data.append({
+                'pine_id': script.pine_id,
+                'name': script.name,
+                'description': script.description or '',
+                'created_at': script.created_at.strftime('%Y-%m-%d')
+            })
+        
+        return jsonify({
+            "success": True,
+            "scripts": scripts_data,
+            "count": len(scripts_data)
+        })
+    except Exception as e:
+        logger.error(f"Error getting agent scripts: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 @app.route('/api/export-script-users/<script_id>')

@@ -38,17 +38,18 @@ class AccessLog:
 class PineScript:
     """In-memory Pine Script storage"""
 
-    def __init__(self, pine_id, name, description="", is_active=True):
+    def __init__(self, pine_id, name, description="", is_active=True, is_visible_to_agent=True):
         self.pine_id = pine_id
         self.name = name
         self.description = description
         self.is_active = is_active
+        self.is_visible_to_agent = is_visible_to_agent
         self.created_at = datetime.utcnow()
 
     @staticmethod
-    def create(pine_id, name, description="", is_active=True):
+    def create(pine_id, name, description="", is_active=True, is_visible_to_agent=True):
         """Create and store a new Pine Script"""
-        script = PineScript(pine_id, name, description, is_active)
+        script = PineScript(pine_id, name, description, is_active, is_visible_to_agent)
         pine_scripts[pine_id] = script
         return script
 
@@ -66,6 +67,11 @@ class PineScript:
     def get_active():
         """Get active Pine Scripts"""
         return [script for script in pine_scripts.values() if script.is_active]
+
+    @staticmethod
+    def get_agent_visible():
+        """Get scripts visible to agents"""
+        return [script for script in pine_scripts.values() if script.is_active and script.is_visible_to_agent]
 
     @staticmethod
     def delete(pine_id):
